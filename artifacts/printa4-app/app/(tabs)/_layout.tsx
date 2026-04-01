@@ -12,10 +12,6 @@ import Colors from "@/constants/colors";
 function NativeTabLayout() {
   return (
     <NativeTabs>
-      <NativeTabs.Trigger name="dashboard">
-        <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>Dashboard</Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="tasks">
         <Icon sf={{ default: "list.bullet", selected: "list.bullet.rectangle.fill" }} />
         <Label>Tasks</Label>
@@ -77,18 +73,6 @@ function ClassicTabLayout() {
       }}
     >
       <Tabs.Screen
-        name="dashboard"
-        options={{
-          title: "Dashboard",
-          tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView name={focused ? "house.fill" : "house"} tintColor={color} size={22} />
-            ) : (
-              <Feather name="home" size={20} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
         name="tasks"
         options={{
           title: "Tasks",
@@ -97,6 +81,19 @@ function ClassicTabLayout() {
               <SymbolView name={focused ? "list.bullet.rectangle.fill" : "list.bullet.rectangle"} tintColor={color} size={22} />
             ) : (
               <Feather name="list" size={20} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: "Dashboard",
+          href: null,
+          tabBarIcon: ({ color, focused }) =>
+            isIOS ? (
+              <SymbolView name={focused ? "house.fill" : "house"} tintColor={color} size={22} />
+            ) : (
+              <Feather name="home" size={20} color={color} />
             ),
         }}
       />

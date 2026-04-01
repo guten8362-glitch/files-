@@ -5,9 +5,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
+  Image,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Feather } from "@expo/vector-icons";
@@ -18,8 +18,9 @@ import { useApp, TaskStatus } from "@/context/AppContext";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { LiveTimer } from "@/components/LiveTimer";
+import { TaskMap } from "@/components/TaskMap";
 
-const QUICK_FIX_ISSUES = ["Paper Jam", "Paper Empty", "Ink Low"];
+const QUICK_FIX_ISSUES = ["Paper Jam", "Paper Empty"];
 
 const STATUS_FLOW: Record<TaskStatus, TaskStatus | null> = {
   Unassigned: "Assigned",
@@ -39,7 +40,7 @@ const STATUS_ACTIONS: Record<TaskStatus, string> = {
 
 export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { tasks, currentUser, takeTask, updateTaskStatus, completeTask } = useApp();
+  const { tasks, currentUser, takeTask, updateTaskStatus, completeTask, printers } = useApp();
   const insets = useSafeAreaInsets();
 
   const task = tasks.find(t => t.id === id);
@@ -56,9 +57,16 @@ export default function TaskDetailScreen() {
   }
 
   const isMyTask = task.assignedTechnicianId === currentUser?.id;
-  const canAct = !task.assignedTechnicianId || isMyTask;
-  const isQuickFix = QUICK_FIX_ISSUES.includes(task.issueType);
+  const printer = printers.find(p => p.printerId === task.printerId);
+  const isPrinterAssignedToMe = printer?.assignedTechnicianId === currentUser?.id;
+  const isSenior = currentUser?.role === "Senior Technician";
+  
+  const canAct = task.assignedTechnicianId ? isMyTask : (isPrinterAssignedToMe || isSenior);
   const nextStatus = STATUS_FLOW[task.status];
+
+  let displayIssue = task.issueType as string;
+  if (displayIssue === "Offline") displayIssue = "Offline (Network Issue)";
+  if (displayIssue === "Paper Empty" || displayIssue === "No Paper") displayIssue = "No Paper";
 
   const handleAction = () => {
     if (Platform.OS !== "web") {
@@ -107,6 +115,13 @@ export default function TaskDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.taskCard}>
+          {printer?.shopImage && (
+            <Image 
+              source={{ uri: printer.shopImage }} 
+              style={styles.shopImage} 
+            />
+          )}
+          
           <View style={styles.taskCardHeader}>
             <View>
               <Text style={styles.taskId}>{task.printerId}</Text>
@@ -128,7 +143,23 @@ export default function TaskDetailScreen() {
           <View style={styles.divider} />
 
           <View style={styles.infoGrid}>
-            <InfoRow icon="alert-circle" label="Issue" value={task.issueType} />
+            <InfoRow icon="alert-circle" label="Issue" value={displayIssue} styleValue={{ color: Colors.priorityHigh, fontFamily: 'Inter_700Bold' }} />
+            <InfoRow icon="shopping-bag" label="Shop" value={printer?.shopName || "Unknown Shop"} />
+            <InfoRow icon="user" label="Owner" value={printer?.ownerName || "Unknown Owner"} />
+            <InfoRow icon="phone" label="Phone" value={printer?.ownerPhone || "N/A"} />
+            {(printer?.latitude && printer?.longitude) ? (
+              <TaskMap 
+                latitude={printer.latitude} 
+                longitude={printer.longitude} 
+                shopName={printer.shopName} 
+                building={task.building} 
+              />
+            ) : (
+              <InfoRow icon="map-pin" label="Coords" value={`${printer?.latitude || 0}, ${printer?.longitude || 0}`} />
+            )}
+            
+            <View style={[styles.divider, { marginVertical: 4 }]} />
+            
             <InfoRow icon="building" label="Building" value={task.building} />
             <InfoRow icon="layers" label="Floor" value={task.floor} />
           </View>
@@ -173,7 +204,7 @@ export default function TaskDetailScreen() {
           <View style={styles.fixSection}>
             <Text style={styles.fixTitle}>Fix Mode</Text>
 
-            {isQuickFix && (
+            {QUICK_FIX_ISSUES.includes(task.issueType) && (
               <View style={styles.tabs}>
                 <Pressable
                   style={[styles.tab, activeTab === "quick" && styles.tabActive]}
@@ -192,12 +223,12 @@ export default function TaskDetailScreen() {
               </View>
             )}
 
-            {(!isQuickFix || activeTab === "detailed") && (
+            {(!QUICK_FIX_ISSUES.includes(task.issueType) || activeTab === "detailed") && (
               <View style={styles.detailedForm}>
                 <View style={styles.formField}>
                   <Text style={styles.formLabel}>Issue Type</Text>
                   <View style={styles.issueOptions}>
-                    {(["Paper Jam", "Offline", "Ink Low", "Error Code", "Hardware Fault", "Connectivity Issue"] as const).map(issue => (
+                    {(["Paper Jam", "Offline", "Error Code", "Hardware Fault", "Connectivity Issue"] as const).map(issue => (
                       <Pressable
                         key={issue}
                         style={[styles.issueChip, issueType === issue && styles.issueChipActive]}
@@ -232,11 +263,11 @@ export default function TaskDetailScreen() {
               </View>
             )}
 
-            {isQuickFix && activeTab === "quick" && (
+            {QUICK_FIX_ISSUES.includes(task.issueType) && activeTab === "quick" && (
               <View style={styles.quickFixInfo}>
                 <Feather name="zap" size={20} color={Colors.priorityLow} />
                 <Text style={styles.quickFixText}>
-                  Quick fix mode for {task.issueType}. Just resolve the issue and tap "Mark as Done".
+                  Quick fix mode for {displayIssue}. Just resolve the issue and tap "Mark as Done".
                 </Text>
               </View>
             )}
@@ -284,12 +315,12 @@ export default function TaskDetailScreen() {
   );
 }
 
-function InfoRow({ icon, label, value }: { icon: string; label: string; value: string }) {
+function InfoRow({ icon, label, value, styleValue }: { icon: string; label: string; value: string; styleValue?: object }) {
   return (
     <View style={styles.infoRow}>
       <Feather name={icon as any} size={14} color={Colors.primary} style={styles.infoIcon} />
       <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
+      <Text style={[styles.infoValue, styleValue]}>{value}</Text>
     </View>
   );
 }
@@ -425,6 +456,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
     flex: 1,
+  },
+  shopImage: {
+    width: "100%",
+    height: 180,
+    borderRadius: 14,
+    marginBottom: 4,
   },
   statusRow: {
     flexDirection: "row",

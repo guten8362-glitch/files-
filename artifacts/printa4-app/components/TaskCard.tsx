@@ -13,6 +13,8 @@ interface Props {
   onPress: () => void;
   onTake?: () => void;
   currentUserId?: string;
+  isSenior?: boolean;
+  isPrinterAssignedToMe?: boolean;
 }
 
 const ISSUE_ICONS: Record<string, string> = {
@@ -26,7 +28,7 @@ const ISSUE_ICONS: Record<string, string> = {
   "Maintenance Due": "settings",
 };
 
-export function TaskCard({ task, onPress, onTake, currentUserId }: Props) {
+export function TaskCard({ task, onPress, onTake, currentUserId, isSenior, isPrinterAssignedToMe }: Props) {
   const isUnassigned = !task.assignedTechnicianId;
   const isMyTask = task.assignedTechnicianId === currentUserId;
   const isOverdue = task.takenAt ? (Date.now() - task.takenAt.getTime()) > 30 * 60 * 1000 : false;
@@ -100,11 +102,18 @@ export function TaskCard({ task, onPress, onTake, currentUserId }: Props) {
         </View>
       </View>
 
-      {isUnassigned && onTake && (
+      {isUnassigned && onTake && (isPrinterAssignedToMe || isSenior) && (
         <Pressable style={styles.takeBtn} onPress={handleTake}>
           <Feather name="check-circle" size={14} color={Colors.white} />
           <Text style={styles.takeBtnText}>Take Task</Text>
         </Pressable>
+      )}
+
+      {isUnassigned && onTake && !isPrinterAssignedToMe && !isSenior && (
+        <View style={styles.restrictedLabel}>
+          <Feather name="lock" size={12} color={Colors.textTertiary} />
+          <Text style={styles.restrictedText}>Assigned to another technician</Text>
+        </View>
       )}
 
       {!isUnassigned && isMyTask && isOverdue && (
@@ -262,5 +271,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_500Medium",
     color: Colors.priorityHigh,
+  },
+  restrictedLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: Colors.background,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderStyle: "dashed",
+  },
+  restrictedText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textTertiary,
   },
 });

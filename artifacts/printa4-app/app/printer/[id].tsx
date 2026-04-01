@@ -79,8 +79,6 @@ export default function PrinterDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Consumables</Text>
           <View style={styles.levelsCard}>
-            <LevelBar label="Ink Level" value={printer.inkLevel} />
-            <View style={styles.levelDivider} />
             <LevelBar label="Paper Level" value={printer.paperLevel} />
           </View>
         </View>
@@ -103,6 +101,8 @@ export default function PrinterDetailScreen() {
             />
             <View style={styles.infoDivider} />
             <InfoRow icon="building" label="Building" value={printer.building} />
+            <View style={styles.infoDivider} />
+            <InfoRow icon="user" label="Responsible Tech" value={printer.assignedTechnicianName} />
             <View style={styles.infoDivider} />
             <InfoRow icon="layers" label="Floor" value={printer.floor} />
           </View>

@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Linking,
 } from "react-native";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
@@ -101,10 +102,10 @@ export default function AssistanceScreen() {
               </View>
 
               <View style={styles.techMeta}>
-                <View style={styles.metaItem}>
+                <Pressable style={styles.metaItem} onPress={() => Linking.openURL(`tel:${tech.phone}`)}>
                   <Feather name="phone" size={12} color={Colors.primary} />
                   <Text style={styles.metaText}>{tech.phone}</Text>
-                </View>
+                </Pressable>
                 <View style={styles.metaItem}>
                   <Feather name="clock" size={12} color={Colors.primary} />
                   <Text style={styles.metaText}>Response: {tech.responseTime}</Text>
@@ -138,7 +139,7 @@ export default function AssistanceScreen() {
                   </Pressable>
                 )}
 
-                <Pressable style={styles.callBtn}>
+                <Pressable style={styles.callBtn} onPress={() => Linking.openURL(`tel:${tech.phone}`)}>
                   <Feather name="phone" size={18} color={Colors.primary} />
                 </Pressable>
               </View>

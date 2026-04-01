@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Linking,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -38,10 +39,10 @@ function TechCard({ tech, taskCount }: { tech: Technician; taskCount: number }) 
           </View>
         </View>
 
-        <View style={styles.emailRow}>
+        <Pressable style={styles.emailRow} onPress={() => Linking.openURL(`mailto:${tech.email}`)}>
           <Feather name="mail" size={11} color={Colors.textTertiary} />
           <Text style={styles.email}>{tech.email}</Text>
-        </View>
+        </Pressable>
 
         <View style={styles.statsRow}>
           <View style={styles.miniStat}>
@@ -67,7 +68,7 @@ function TechCard({ tech, taskCount }: { tech: Technician; taskCount: number }) 
       </View>
 
       <View style={styles.cardRight}>
-        <Pressable style={styles.callBtn}>
+        <Pressable style={styles.callBtn} onPress={() => Linking.openURL(`tel:${tech.phone}`)}>
           <Feather name="phone" size={14} color={Colors.primary} />
         </Pressable>
       </View>

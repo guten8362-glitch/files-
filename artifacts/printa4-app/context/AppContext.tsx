@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 
 export type Priority = "High" | "Medium" | "Low";
 export type TaskStatus = "Unassigned" | "Assigned" | "On the way" | "Fixing" | "Completed";
-export type IssueType = "Paper Jam" | "Offline" | "Ink Low" | "Paper Empty" | "Error Code" | "Connectivity Issue" | "Hardware Fault" | "Maintenance Due";
+export type IssueType = "Paper Jam" | "Offline" | "Paper Empty" | "Error Code" | "Connectivity Issue" | "Hardware Fault" | "Maintenance Due" | "Low Paper" | "No Paper";
 export type TechnicianStatus = "Available" | "Busy" | "Offline";
 
 export interface Technician {
@@ -44,11 +44,20 @@ export interface PrinterHealth {
   building: string;
   floor: string;
   status: "Online" | "Offline" | "Warning";
-  inkLevel: number;
   paperLevel: number;
   lastServiced: Date;
   model: string;
+  assignedTechnicianId: string;
+  assignedTechnicianName: string;
   errorHistory: { date: Date; error: string; resolvedBy: string }[];
+  shopName: string;
+  ownerName: string;
+  ownerPhone: string;
+  maxPaperCapacity: number;
+  printedCount: number;
+  latitude: number;
+  longitude: number;
+  shopImage: string;
 }
 
 export interface CurrentUser {
@@ -70,6 +79,7 @@ interface AppContextType {
   updateTaskStatus: (taskId: string, status: TaskStatus) => void;
   completeTask: (taskId: string, notes?: string) => void;
   requestAssistance: (taskId: string) => void;
+  addPrinter: (printer: Omit<PrinterHealth, "id" | "errorHistory" | "status" | "paperLevel" | "lastServiced">) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -170,22 +180,7 @@ const MOCK_TASKS: PrinterTask[] = [
     completedAt: null,
     customerWaiting: true,
   },
-  {
-    id: "task3",
-    printerId: "PRN-312",
-    location: "Science Block - Lab 3",
-    building: "Science Block",
-    floor: "3rd Floor",
-    issueType: "Ink Low",
-    priority: "Medium",
-    status: "On the way",
-    assignedTechnicianId: "t1",
-    assignedTechnicianName: "Arjun Sharma",
-    createdAt: new Date(Date.now() - 15 * 60 * 1000),
-    takenAt: new Date(Date.now() - 10 * 60 * 1000),
-    completedAt: null,
-    customerWaiting: false,
-  },
+
   {
     id: "task4",
     printerId: "PRN-418",
@@ -244,14 +239,22 @@ const MOCK_PRINTERS: PrinterHealth[] = [
     building: "Central Library",
     floor: "2nd Floor",
     status: "Warning",
-    inkLevel: 15,
     paperLevel: 0,
     lastServiced: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
     model: "HP LaserJet Pro M404n",
+    assignedTechnicianId: "t1",
+    assignedTechnicianName: "Arjun Sharma",
+    shopName: "Central Lib Kiosk",
+    ownerName: "Dr. Ramesh",
+    ownerPhone: "+91 9988776655",
+    maxPaperCapacity: 500,
+    printedCount: 500,
+    latitude: 12.9716,
+    longitude: 77.5946,
+    shopImage: "https://images.unsplash.com/photo-1544256718-3bcf237f3974?auto=format&fit=crop&q=80&w=400",
     errorHistory: [
-      { date: new Date(Date.now() - 25 * 60 * 1000), error: "Paper Jam - Tray 1", resolvedBy: "Arjun Sharma" },
-      { date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), error: "Ink Low Warning", resolvedBy: "Priya Nair" },
-      { date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), error: "Scheduled Maintenance", resolvedBy: "Ravi Kumar" },
+      { date: new Date(Date.now() - 25 * 60 * 1000), error: "No Paper", resolvedBy: "Arjun Sharma" },
+      { date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), error: "Low Paper", resolvedBy: "Priya Nair" },
     ],
   },
   {
@@ -261,13 +264,21 @@ const MOCK_PRINTERS: PrinterHealth[] = [
     building: "Admin Block",
     floor: "Ground Floor",
     status: "Offline",
-    inkLevel: 60,
     paperLevel: 80,
     lastServiced: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
     model: "Canon imageRUNNER 2425",
+    assignedTechnicianId: "t3",
+    assignedTechnicianName: "Ravi Kumar",
+    shopName: "Admin FastPrint",
+    ownerName: "Admin Office",
+    ownerPhone: "+91 8877665544",
+    maxPaperCapacity: 1000,
+    printedCount: 200,
+    latitude: 12.9720,
+    longitude: 77.5950,
+    shopImage: "https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&q=80&w=400",
     errorHistory: [
       { date: new Date(Date.now() - 45 * 60 * 1000), error: "Device Offline - Network Error", resolvedBy: "" },
-      { date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), error: "Toner Replaced", resolvedBy: "Meena Iyer" },
     ],
   },
   {
@@ -277,10 +288,19 @@ const MOCK_PRINTERS: PrinterHealth[] = [
     building: "Science Block",
     floor: "3rd Floor",
     status: "Online",
-    inkLevel: 35,
     paperLevel: 70,
     lastServiced: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000),
     model: "Epson EcoTank L3250",
+    assignedTechnicianId: "t1",
+    assignedTechnicianName: "Arjun Sharma",
+    shopName: "Sci-Lab Printers",
+    ownerName: "Prof. Anika",
+    ownerPhone: "+91 9123456780",
+    maxPaperCapacity: 250,
+    printedCount: 75,
+    latitude: 12.9710,
+    longitude: 77.5940,
+    shopImage: "https://images.unsplash.com/photo-1560205001-a7fedfbfa4d7?auto=format&fit=crop&q=80&w=400",
     errorHistory: [
       { date: new Date(Date.now() - 15 * 60 * 1000), error: "Ink Low - Cyan Cartridge", resolvedBy: "" },
     ],
@@ -298,7 +318,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [tasks, setTasks] = useState<PrinterTask[]>(MOCK_TASKS);
   const [technicians] = useState<Technician[]>(MOCK_TECHNICIANS);
-  const [printers] = useState<PrinterHealth[]>(MOCK_PRINTERS);
+  const [printers, setPrinters] = useState<PrinterHealth[]>(MOCK_PRINTERS);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -336,13 +356,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!currentUser) return;
     setTasks(prev => prev.map(t => {
       if (t.id === taskId && !t.assignedTechnicianId) {
-        return {
-          ...t,
-          status: "Assigned" as TaskStatus,
-          assignedTechnicianId: currentUser.id,
-          assignedTechnicianName: currentUser.name,
-          takenAt: new Date(),
-        };
+        // Find the printer for this task to check its assignment
+        const printer = printers.find(p => p.printerId === t.printerId);
+        const isAssignedToMe = printer?.assignedTechnicianId === currentUser.id;
+        const isSeniorTech = currentUser.role === "Senior Technician";
+
+        if (isAssignedToMe || isSeniorTech) {
+          return {
+            ...t,
+            status: "Assigned" as TaskStatus,
+            assignedTechnicianId: currentUser.id,
+            assignedTechnicianName: currentUser.name,
+            takenAt: new Date(),
+          };
+        }
       }
       return t;
     }));
@@ -363,10 +390,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const requestAssistance = (_taskId: string) => {};
 
+  const addPrinter = (printerData: Omit<PrinterHealth, "id" | "errorHistory" | "status" | "paperLevel" | "lastServiced">) => {
+    // Math Logic for initial paperLevel
+    const remaining = printerData.maxPaperCapacity - printerData.printedCount;
+    const initialPaperLevel = Math.max(0, Math.round((remaining / printerData.maxPaperCapacity) * 100));
+
+    const newPrinter: PrinterHealth = {
+      ...printerData,
+      id: "p" + Date.now(),
+      status: initialPaperLevel === 0 ? "Warning" : "Online",
+      paperLevel: initialPaperLevel,
+      lastServiced: new Date(),
+      errorHistory: [],
+    };
+    
+    setPrinters(prev => [newPrinter, ...prev]);
+
+    // Automated Task Generation based on the mathematical threshold:
+    if (initialPaperLevel <= 15) {
+      const isZero = initialPaperLevel === 0;
+      setTasks(prev => [{
+        id: "t_" + Date.now(),
+        printerId: newPrinter.printerId,
+        location: newPrinter.location,
+        issueType: isZero ? "No Paper" : "Low Paper",
+        priority: isZero ? "High" : "Medium",
+        status: "Unassigned",
+        assignedTechnicianId: null, // Follow assignment rules
+        assignedTechnicianName: null,
+        createdAt: new Date(),
+        takenAt: null,
+        completedAt: null,
+        customerWaiting: isZero,
+        building: newPrinter.building,
+        floor: newPrinter.floor,
+      }, ...prev]);
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       currentUser, isLoggedIn, tasks, technicians, printers,
-      login, logout, takeTask, updateTaskStatus, completeTask, requestAssistance,
+      login, logout, takeTask, updateTaskStatus, completeTask, requestAssistance, addPrinter
     }}>
       {children}
     </AppContext.Provider>

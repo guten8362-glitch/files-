@@ -1,5 +1,5 @@
 {
-  "name": "@workspace/printa4-app",
+  "name": "@workspace/print-tech-flow",
   "version": "0.0.0",
   "private": true,
   "main": "expo-router/entry",
@@ -54,5 +54,8 @@
     "typescript": "~5.9.2",
     "zod": "catalog:",
     "zod-validation-error": "^3.4.0"
+  },
+  "dependencies": {
+    "react-native-maps": "1.20.1"
   }
 }

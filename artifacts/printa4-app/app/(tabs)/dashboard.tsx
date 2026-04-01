@@ -55,92 +55,10 @@ export default function DashboardScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.alertBanner}>
-        <Feather name="alert-triangle" size={14} color={Colors.priorityHigh} />
-        <Text style={styles.alertText}>{high} high-priority tasks need immediate attention</Text>
-      </View>
-
-      <Text style={styles.sectionTitle}>Overview</Text>
-
-      <View style={styles.statsGrid}>
-        <Pressable style={[styles.statCard, styles.statCardPrimary]} onPress={() => router.push("/(tabs)/tasks")}>
-          <View style={styles.statIconBox}>
-            <Feather name="layers" size={20} color={Colors.white} />
-          </View>
-          <Text style={styles.statValueWhite}>{total}</Text>
-          <Text style={styles.statLabelWhite}>Active Tasks</Text>
-          <View style={styles.statArrow}>
-            <Feather name="arrow-right" size={14} color={Colors.white} />
-          </View>
-        </Pressable>
-
-        <Pressable style={[styles.statCard, styles.statCardHigh]} onPress={() => router.push("/(tabs)/tasks")}>
-          <View style={[styles.statIconBox, { backgroundColor: Colors.priorityHigh }]}>
-            <Feather name="alert-circle" size={20} color={Colors.white} />
-          </View>
-          <Text style={[styles.statValue, { color: Colors.priorityHigh }]}>{high}</Text>
-          <Text style={styles.statLabel}>High Priority</Text>
-        </Pressable>
-
-        <Pressable style={[styles.statCard, styles.statCardMedium]} onPress={() => router.push("/(tabs)/tasks")}>
-          <View style={[styles.statIconBox, { backgroundColor: Colors.priorityMedium }]}>
-            <Feather name="clock" size={20} color={Colors.white} />
-          </View>
-          <Text style={[styles.statValue, { color: Colors.priorityMedium }]}>{medium}</Text>
-          <Text style={styles.statLabel}>Medium</Text>
-        </Pressable>
-
-        <Pressable style={[styles.statCard, styles.statCardLow]} onPress={() => router.push("/(tabs)/tasks")}>
-          <View style={[styles.statIconBox, { backgroundColor: Colors.priorityLow }]}>
-            <Feather name="check-circle" size={20} color={Colors.white} />
-          </View>
-          <Text style={[styles.statValue, { color: Colors.priorityLow }]}>{low}</Text>
-          <Text style={styles.statLabel}>Low</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.quickStats}>
-        <View style={styles.quickStatItem}>
-          <Text style={styles.quickStatValue}>{unassigned}</Text>
-          <Text style={styles.quickStatLabel}>Unassigned</Text>
-        </View>
-        <View style={styles.quickStatDivider} />
-        <View style={styles.quickStatItem}>
-          <Text style={styles.quickStatValue}>{myTasks}</Text>
-          <Text style={styles.quickStatLabel}>My Tasks</Text>
-        </View>
-        <View style={styles.quickStatDivider} />
-        <View style={styles.quickStatItem}>
-          <Text style={[styles.quickStatValue, { color: Colors.statusAvailable }]}>{available}</Text>
-          <Text style={styles.quickStatLabel}>Available</Text>
-        </View>
-      </View>
-
-      <Text style={styles.sectionTitle}>Quick Actions</Text>
-      <View style={styles.quickActions}>
-        {[
-          { icon: "list", label: "All Tasks", route: "/(tabs)/tasks", color: Colors.primary },
-          { icon: "printer", label: "Printers", route: "/(tabs)/printers", color: Colors.accent },
-          { icon: "users", label: "Technicians", route: "/(tabs)/technicians", color: "#FF9500" },
-          { icon: "bar-chart-2", label: "Performance", route: "/(tabs)/performance", color: Colors.statusAvailable },
-        ].map((action) => (
-          <Pressable
-            key={action.label}
-            style={({ pressed }) => [styles.quickAction, pressed && { opacity: 0.8 }]}
-            onPress={() => router.push(action.route as any)}
-          >
-            <View style={[styles.quickActionIcon, { backgroundColor: action.color + "15" }]}>
-              <Feather name={action.icon as any} size={22} color={action.color} />
-            </View>
-            <Text style={styles.quickActionLabel}>{action.label}</Text>
-          </Pressable>
-        ))}
-      </View>
-
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
+        <Text style={styles.sectionTitle}>Recent Tasks</Text>
         <Pressable onPress={() => router.push("/(tabs)/tasks")}>
-          <Text style={styles.seeAll}>See all</Text>
+          <Text style={styles.seeAll}>See code</Text>
         </Pressable>
       </View>
 
@@ -167,6 +85,79 @@ export default function DashboardScreen() {
           </Pressable>
         ))}
       </View>
+
+      <Text style={styles.sectionTitle}>Performance Overview</Text>
+
+      <View style={styles.statsGrid}>
+        <Pressable style={[styles.statCard, styles.statCardPrimary]} onPress={() => router.push("/(tabs)/tasks")}>
+          <View style={styles.statIconBox}>
+            <Feather name="layers" size={20} color={Colors.white} />
+          </View>
+          <Text style={styles.statValueWhite}>{total}</Text>
+          <Text style={styles.statLabelWhite}>Active Tasks</Text>
+          <View style={styles.statArrow}>
+            <Feather name="arrow-right" size={14} color={Colors.white} />
+          </View>
+        </Pressable>
+
+        <Pressable style={[styles.statCard, styles.statCardHigh]} onPress={() => router.push("/(tabs)/tasks")}>
+          <View style={[styles.statIconBox, { backgroundColor: Colors.priorityHigh }]}>
+            <Feather name="alert-circle" size={20} color={Colors.white} />
+          </View>
+          <Text style={[styles.statValue, { color: Colors.priorityHigh }]}>{high}</Text>
+          <Text style={styles.statLabel}>Critical</Text>
+        </Pressable>
+
+        <Pressable style={[styles.statCard, styles.statCardMedium]} onPress={() => router.push("/(tabs)/tasks")}>
+          <View style={[styles.statIconBox, { backgroundColor: Colors.priorityMedium }]}>
+            <Feather name="clock" size={20} color={Colors.white} />
+          </View>
+          <Text style={[styles.statValue, { color: Colors.priorityMedium }]}>{medium}</Text>
+          <Text style={styles.statLabel}>Pending</Text>
+        </Pressable>
+
+        <Pressable style={[styles.statCard, styles.statCardLow]} onPress={() => router.push("/(tabs)/tasks")}>
+          <View style={[styles.statIconBox, { backgroundColor: Colors.priorityLow }]}>
+            <Feather name="check-circle" size={20} color={Colors.white} />
+          </View>
+          <Text style={[styles.statValue, { color: Colors.priorityLow }]}>{low}</Text>
+          <Text style={styles.statLabel}>Resolved</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.databaseSection}>
+        <View style={styles.databaseHeader}>
+          <Feather name="database" size={16} color={Colors.primary} />
+          <Text style={styles.databaseTitle}>Appwrite Backend</Text>
+        </View>
+        <View style={styles.databasePlaceholder}>
+          <Text style={styles.databaseText}>Connected to Appwrite Cluster</Text>
+          <Text style={styles.databaseSub}>Waiting for live data sync...</Text>
+        </View>
+      </View>
+
+      <Text style={styles.sectionTitle}>Quick Actions</Text>
+      <View style={styles.quickActions}>
+        {[
+          { icon: "list", label: "All Tasks", route: "/(tabs)/tasks", color: Colors.primary },
+          { icon: "printer", label: "Printers", route: "/(tabs)/printers", color: Colors.accent },
+          { icon: "users", label: "Technicians", route: "/(tabs)/technicians", color: "#FF9500" },
+          { icon: "bar-chart-2", label: "Performance", route: "/(tabs)/performance", color: Colors.statusAvailable },
+        ].map((action) => (
+          <Pressable
+            key={action.label}
+            style={({ pressed }) => [styles.quickAction, pressed && { opacity: 0.8 }]}
+            onPress={() => router.push(action.route as any)}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: action.color + "15" }]}>
+              <Feather name={action.icon as any} size={22} color={action.color} />
+            </View>
+            <Text style={styles.quickActionLabel}>{action.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+
     </ScrollView>
   );
 }
@@ -395,5 +386,42 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
+  },
+  databaseSection: {
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    borderStyle: "dashed",
+    gap: 12,
+  },
+  databaseHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  databaseTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+  },
+  databasePlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    gap: 4,
+  },
+  databaseText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+  },
+  databaseSub: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textTertiary,
   },
 });

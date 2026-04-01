@@ -14,28 +14,27 @@ import Colors from "@/constants/colors";
 import { useApp, Priority, TaskStatus } from "@/context/AppContext";
 import { TaskCard } from "@/components/TaskCard";
 
-type FilterType = "All" | "Mine" | "Unassigned" | "High" | "Medium" | "Low";
-
 export default function TasksScreen() {
-  const { tasks, takeTask, currentUser } = useApp();
+  const { tasks, takeTask, currentUser, printers } = useApp();
   const insets = useSafeAreaInsets();
-  const [filter, setFilter] = useState<FilterType>("All");
-
   const filtered = useMemo(() => {
     let list = tasks.filter(t => t.status !== "Completed");
-    if (filter === "Mine") list = list.filter(t => t.assignedTechnicianId === currentUser?.id);
-    else if (filter === "Unassigned") list = list.filter(t => !t.assignedTechnicianId);
-    else if (filter === "High") list = list.filter(t => t.priority === "High");
-    else if (filter === "Medium") list = list.filter(t => t.priority === "Medium");
-    else if (filter === "Low") list = list.filter(t => t.priority === "Low");
+    
+    // If not admin, only show tasks related to their assigned printers / assignments
+    if (currentUser?.role !== "Senior Technician") {
+      list = list.filter(t => {
+        const isTaskAssignedToMe = t.assignedTechnicianId === currentUser?.id;
+        const printer = printers.find(p => p.printerId === t.printerId);
+        const isPrinterAssignedToMe = printer?.assignedTechnicianId === currentUser?.id;
+        return isTaskAssignedToMe || isPrinterAssignedToMe;
+      });
+    }
 
     return list.sort((a, b) => {
       const priorityOrder: Record<Priority, number> = { High: 0, Medium: 1, Low: 2 };
       return priorityOrder[a.priority] - priorityOrder[b.priority];
     });
-  }, [tasks, filter, currentUser]);
-
-  const FILTERS: FilterType[] = ["All", "Mine", "Unassigned", "High", "Medium", "Low"];
+  }, [tasks, currentUser]);
 
   return (
     <View style={styles.root}>
@@ -53,22 +52,6 @@ export default function TasksScreen() {
             <Text style={styles.assistBtnText}>Help</Text>
           </Pressable>
         </View>
-
-        <FlatList
-          data={FILTERS}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterBar}
-          keyExtractor={(item) => item}
-          renderItem={({ item }) => (
-            <Pressable
-              style={[styles.filterChip, filter === item && styles.filterChipActive]}
-              onPress={() => setFilter(item)}
-            >
-              <Text style={[styles.filterText, filter === item && styles.filterTextActive]}>{item}</Text>
-            </Pressable>
-          )}
-        />
       </View>
 
       <FlatList
@@ -84,13 +67,15 @@ export default function TasksScreen() {
             onPress={() => router.push({ pathname: "/task/[id]", params: { id: item.id } })}
             onTake={() => takeTask(item.id)}
             currentUserId={currentUser?.id}
+            isSenior={currentUser?.role === "Senior Technician"}
+            isPrinterAssignedToMe={printers.find(p => p.printerId === item.printerId)?.assignedTechnicianId === currentUser?.id}
           />
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Feather name="check-circle" size={40} color={Colors.priorityLow} />
             <Text style={styles.emptyTitle}>All clear!</Text>
-            <Text style={styles.emptyText}>No active tasks for this filter.</Text>
+            <Text style={styles.emptyText}>You have no pending tasks right now.</Text>
           </View>
         }
         showsVerticalScrollIndicator={false}
@@ -141,31 +126,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     color: Colors.priorityHigh,
-  },
-  filterBar: {
-    gap: 8,
-    paddingRight: 4,
-  },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  filterChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  filterText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: Colors.textSecondary,
-  },
-  filterTextActive: {
-    color: Colors.white,
-    fontFamily: "Inter_600SemiBold",
   },
   list: {
     paddingHorizontal: 16,
