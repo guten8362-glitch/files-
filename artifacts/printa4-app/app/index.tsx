@@ -7,7 +7,7 @@ export default function IndexRedirect() {
   const { isLoggedIn } = useApp();
 
   if (isLoggedIn) {
-    return <Redirect href="/(tabs)/dashboard" />;
+    return <Redirect href="/(tabs)/tasks" />;
   }
 
   return <Redirect href="/login" />;

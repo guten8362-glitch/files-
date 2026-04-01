@@ -39,7 +39,7 @@ export default function LoginScreen() {
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
-        router.replace("/(tabs)/dashboard");
+        router.replace("/(tabs)/tasks");
       } else {
         setError("Invalid credentials. Please check your email and password.");
         if (Platform.OS !== "web") {

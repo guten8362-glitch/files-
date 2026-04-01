@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useApp, TaskStatus } from "@/context/AppContext";
@@ -17,6 +18,8 @@ import { TaskCard } from "@/components/TaskCard";
 export default function TasksScreen() {
   const { tasks, takeTask, currentUser } = useApp();
   const insets = useSafeAreaInsets();
+  const [isAiActive, setIsAiActive] = useState(false);
+
   const filtered = useMemo(() => {
     // Always exclude completed tasks
     let list = tasks.filter(t => t.status !== "Completed");
@@ -30,8 +33,35 @@ export default function TasksScreen() {
       );
     }
 
-    return list;
-  }, [tasks, currentUser]);
+    if (!isAiActive) {
+      return list;
+    }
+
+    return list.sort((a, b) => {
+      const aUrgent = a.customerWaiting && a.priority === "High" ? 1 : 0;
+      const bUrgent = b.customerWaiting && b.priority === "High" ? 1 : 0;
+      if (bUrgent !== aUrgent) return bUrgent - aUrgent;
+
+      const aWaiting = a.customerWaiting ? 1 : 0;
+      const bWaiting = b.customerWaiting ? 1 : 0;
+      if (bWaiting !== aWaiting) return bWaiting - aWaiting;
+
+      const priorityWeight: Record<string, number> = { High: 3, Medium: 2, Low: 1 };
+      const pDiff = priorityWeight[b.priority] - priorityWeight[a.priority];
+      if (pDiff !== 0) return pDiff;
+      
+      return a.createdAt.getTime() - b.createdAt.getTime();
+    });
+  }, [tasks, currentUser, isAiActive]);
+
+  const toggleAi = () => {
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(
+        !isAiActive ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
+      );
+    }
+    setIsAiActive(!isAiActive);
+  };
 
   return (
     <View style={styles.root}>
@@ -51,6 +81,18 @@ export default function TasksScreen() {
         </View>
       </View>
 
+      <View style={styles.aiContainer}>
+        <Pressable 
+          style={[styles.aiBtn, isAiActive && styles.aiBtnActive]} 
+          onPress={toggleAi}
+        >
+          <Feather name="zap" size={16} color={isAiActive ? Colors.white : '#8b5cf6'} />
+          <Text style={[styles.aiBtnText, isAiActive && styles.aiBtnTextActive]}>
+            {isAiActive ? "✨ AI Plan Active" : "✨ AI Fix My Plan"}
+          </Text>
+        </Pressable>
+      </View>
+
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
@@ -58,7 +100,7 @@ export default function TasksScreen() {
           styles.list,
           { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 100) },
         ]}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <TaskCard
             task={item}
             onPress={() => router.push({ pathname: "/task/[id]", params: { id: item.id } })}
@@ -66,6 +108,7 @@ export default function TasksScreen() {
             currentUserId={currentUser?.id}
             isSenior={currentUser?.role === "Senior Technician"}
             isPrinterAssignedToMe={false}
+            isAiRecommended={isAiActive && index === 0}
           />
         )}
         ListEmptyComponent={
@@ -123,6 +166,38 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     color: Colors.priorityHigh,
+  },
+  aiContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  aiBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: '#f3e8ff',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e9d5ff',
+  },
+  aiBtnActive: {
+    backgroundColor: '#8b5cf6',
+    borderColor: '#8b5cf6',
+    shadowColor: '#8b5cf6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  aiBtnText: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+    color: '#8b5cf6',
+  },
+  aiBtnTextActive: {
+    color: Colors.white,
   },
   list: {
     paddingHorizontal: 16,

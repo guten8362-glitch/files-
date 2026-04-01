@@ -85,19 +85,6 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
-        name="dashboard"
-        options={{
-          title: "Dashboard",
-          href: null,
-          tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView name={focused ? "house.fill" : "house"} tintColor={color} size={22} />
-            ) : (
-              <Feather name="home" size={20} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
         name="printers"
         options={{
           title: "Printers",

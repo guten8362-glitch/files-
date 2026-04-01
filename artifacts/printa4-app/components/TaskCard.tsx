@@ -15,6 +15,7 @@ interface Props {
   currentUserId?: string;
   isSenior?: boolean;
   isPrinterAssignedToMe?: boolean;
+  isAiRecommended?: boolean;
 }
 
 const ISSUE_ICONS: Record<string, string> = {
@@ -28,7 +29,7 @@ const ISSUE_ICONS: Record<string, string> = {
   "Maintenance Due": "settings",
 };
 
-export function TaskCard({ task, onPress, onTake, currentUserId, isSenior, isPrinterAssignedToMe }: Props) {
+export function TaskCard({ task, onPress, onTake, currentUserId, isSenior, isPrinterAssignedToMe, isAiRecommended }: Props) {
   const isUnassigned = !task.assignedTechnicianId;
   const isMyTask = task.assignedTechnicianId === currentUserId;
   const isOverdue = task.takenAt ? (Date.now() - task.takenAt.getTime()) > 30 * 60 * 1000 : false;
@@ -42,10 +43,28 @@ export function TaskCard({ task, onPress, onTake, currentUserId, isSenior, isPri
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      style={({ pressed }) => [
+        styles.card, 
+        isAiRecommended && styles.aiCard,
+        pressed && styles.cardPressed
+      ]}
       onPress={onPress}
     >
-      {task.customerWaiting && (
+      {isAiRecommended && (
+        <View style={styles.aiBanner}>
+          <Feather name="zap" size={12} color={Colors.white} />
+          <Text style={styles.aiBannerText}>✨ AI Recommended Next Stop</Text>
+        </View>
+      )}
+
+      {task.customerWaiting && !isAiRecommended && (
+        <View style={styles.waitingBanner}>
+          <Feather name="user" size={10} color={Colors.white} />
+          <Text style={styles.waitingText}>Customer Waiting</Text>
+        </View>
+      )}
+
+      {task.customerWaiting && isAiRecommended && (
         <View style={styles.waitingBanner}>
           <Feather name="user" size={10} color={Colors.white} />
           <Text style={styles.waitingText}>Customer Waiting</Text>
@@ -144,6 +163,30 @@ const styles = StyleSheet.create({
   cardPressed: {
     opacity: 0.95,
     transform: [{ scale: 0.99 }],
+  },
+  aiCard: {
+    borderColor: '#8b5cf6',
+    borderWidth: 2,
+    shadowColor: '#8b5cf6',
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  aiBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: '#8b5cf6',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+    marginBottom: 4,
+  },
+  aiBannerText: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    color: Colors.white,
   },
   waitingBanner: {
     flexDirection: "row",
