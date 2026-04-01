@@ -40,7 +40,7 @@ export default function PerformanceScreen() {
   const ranked = [...technicians].sort((a, b) => b.tasksCompleted - a.tasksCompleted);
   const myStats = technicians.find(t => t.email === currentUser?.email);
   const myRank = myStats ? ranked.findIndex(t => t.id === myStats.id) + 1 : null;
-  const maxTasks = Math.max(...technicians.map(t => t.tasksCompleted));
+  const maxTasks = technicians.length > 0 ? Math.max(...technicians.map(t => t.tasksCompleted), 1) : 1;
 
   const totalCompleted = tasks.filter(t => t.status === "Completed").length;
 
@@ -106,7 +106,7 @@ export default function PerformanceScreen() {
       <Text style={styles.leaderboardTitle}>Leaderboard</Text>
 
       <View style={styles.leaderboard}>
-        {ranked.map((tech, index) => (
+        {ranked.length > 0 ? ranked.map((tech, index) => (
           <View key={tech.id} style={[styles.leaderRow, index < ranked.length - 1 && styles.leaderRowBorder]}>
             <RankBadge rank={index + 1} />
 
@@ -127,7 +127,11 @@ export default function PerformanceScreen() {
               <StatBar value={tech.tasksCompleted} max={maxTasks} color={index === 0 ? "#FFD700" : index === 1 ? "#C0C0C0" : index === 2 ? "#CD7F32" : Colors.primary} />
             </View>
           </View>
-        ))}
+        )) : (
+          <View style={styles.emptyLeaderboard}>
+            <Text style={styles.emptyLeaderboardText}>No rankings available yet.</Text>
+          </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -330,5 +334,14 @@ const styles = StyleSheet.create({
   barFill: {
     height: "100%",
     borderRadius: 2,
+  },
+  emptyLeaderboard: {
+    padding: 40,
+    alignItems: "center",
+  },
+  emptyLeaderboardText: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
   },
 });

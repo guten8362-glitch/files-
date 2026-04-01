@@ -63,7 +63,7 @@ export default function DashboardScreen() {
       </View>
 
       <View style={styles.activityList}>
-        {recentActivity.map((task) => (
+        {recentActivity.length > 0 ? recentActivity.map((task) => (
           <Pressable
             key={task.id}
             style={({ pressed }) => [styles.activityItem, pressed && { opacity: 0.8 }]}
@@ -83,7 +83,11 @@ export default function DashboardScreen() {
             </View>
             <Feather name="chevron-right" size={16} color={Colors.textTertiary} />
           </Pressable>
-        ))}
+        )) : (
+          <View style={styles.emptyActivity}>
+            <Text style={styles.emptyActivityText}>No recent tasks.</Text>
+          </View>
+        )}
       </View>
 
       <Text style={styles.sectionTitle}>Performance Overview</Text>
@@ -131,8 +135,11 @@ export default function DashboardScreen() {
           <Text style={styles.databaseTitle}>Appwrite Backend</Text>
         </View>
         <View style={styles.databasePlaceholder}>
-          <Text style={styles.databaseText}>Connected to Appwrite Cluster</Text>
-          <Text style={styles.databaseSub}>Waiting for live data sync...</Text>
+          <View style={styles.syncRow}>
+            <View style={styles.syncDot} />
+            <Text style={styles.databaseText}>Connected to Appwrite Cluster</Text>
+          </View>
+          <Text style={styles.databaseSub}>Real-time synchronization active</Text>
         </View>
       </View>
 
@@ -423,5 +430,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_400Regular",
     color: Colors.textTertiary,
+  },
+  emptyActivity: {
+    padding: 20,
+    alignItems: "center",
+  },
+  emptyActivityText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textTertiary,
+  },
+  syncRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  syncDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.statusOnline,
   },
 });

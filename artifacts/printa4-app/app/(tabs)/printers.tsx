@@ -104,7 +104,7 @@ export default function PrintersScreen() {
 
   const filteredPrinters = currentUser?.role === "Senior Technician" 
     ? printers 
-    : printers.filter(p => p.assignedTechnicianId === currentUser?.id);
+    : printers.filter(p => !p.assignedTechnicianId || p.assignedTechnicianId === currentUser?.id);
 
   const online = filteredPrinters.filter(p => p.status === "Online").length;
   const offline = filteredPrinters.filter(p => p.status === "Offline").length;
@@ -144,7 +144,8 @@ export default function PrintersScreen() {
       longitude: parseFloat(newPrinterData.longitude) || 77.0,
       shopImage: newPrinterData.shopImage || "https://images.unsplash.com/photo-1560205001-a7fedfbfa4d7?auto=format&fit=crop&q=80&w=400",
       assignedTechnicianId: currentUser?.id || "t1",
-      assignedTechnicianName: currentUser?.name || "Unassigned"
+      assignedTechnicianName: currentUser?.name || "Unassigned",
+      inkLevel: 100,
     });
     
     setNewPrinterData({

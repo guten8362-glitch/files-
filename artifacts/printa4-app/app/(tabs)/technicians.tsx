@@ -119,6 +119,13 @@ export default function TechniciansScreen() {
         renderItem={({ item }) => (
           <TechCard tech={item} taskCount={getTaskCount(item.id)} />
         )}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Feather name="users" size={40} color={Colors.textTertiary} />
+            <Text style={styles.emptyTitle}>No staff members</Text>
+            <Text style={styles.emptyText}>There are no technicians in the database yet.</Text>
+          </View>
+        }
         showsVerticalScrollIndicator={false}
       />
     </View>
@@ -301,5 +308,22 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryUltraLight,
     alignItems: "center",
     justifyContent: "center",
+  },
+  empty: {
+    alignItems: "center",
+    paddingTop: 80,
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+  },
+  emptyText: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center",
   },
 });

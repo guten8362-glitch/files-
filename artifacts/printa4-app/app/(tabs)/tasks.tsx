@@ -11,29 +11,26 @@ import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { useApp, Priority, TaskStatus } from "@/context/AppContext";
+import { useApp, TaskStatus } from "@/context/AppContext";
 import { TaskCard } from "@/components/TaskCard";
 
 export default function TasksScreen() {
-  const { tasks, takeTask, currentUser, printers } = useApp();
+  const { tasks, takeTask, currentUser } = useApp();
   const insets = useSafeAreaInsets();
   const filtered = useMemo(() => {
+    // Always exclude completed tasks
     let list = tasks.filter(t => t.status !== "Completed");
-    
-    // If not admin, only show tasks related to their assigned printers / assignments
+
+    // Regular Technicians: show unassigned tasks + tasks assigned to me
+    // Senior Technicians: see all tasks
     if (currentUser?.role !== "Senior Technician") {
-      list = list.filter(t => {
-        const isTaskAssignedToMe = t.assignedTechnicianId === currentUser?.id;
-        const printer = printers.find(p => p.printerId === t.printerId);
-        const isPrinterAssignedToMe = printer?.assignedTechnicianId === currentUser?.id;
-        return isTaskAssignedToMe || isPrinterAssignedToMe;
-      });
+      list = list.filter(t =>
+        !t.assignedTechnicianId || // unassigned — anyone can claim
+        t.assignedTechnicianId === currentUser?.id // assigned to me
+      );
     }
 
-    return list.sort((a, b) => {
-      const priorityOrder: Record<Priority, number> = { High: 0, Medium: 1, Low: 2 };
-      return priorityOrder[a.priority] - priorityOrder[b.priority];
-    });
+    return list;
   }, [tasks, currentUser]);
 
   return (
@@ -68,7 +65,7 @@ export default function TasksScreen() {
             onTake={() => takeTask(item.id)}
             currentUserId={currentUser?.id}
             isSenior={currentUser?.role === "Senior Technician"}
-            isPrinterAssignedToMe={printers.find(p => p.printerId === item.printerId)?.assignedTechnicianId === currentUser?.id}
+            isPrinterAssignedToMe={false}
           />
         )}
         ListEmptyComponent={

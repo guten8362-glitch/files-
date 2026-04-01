@@ -41,7 +41,7 @@ export default function LoginScreen() {
         }
         router.replace("/(tabs)/dashboard");
       } else {
-        setError("Invalid credentials. Try arjun.sharma@college.edu / tech123");
+        setError("Invalid credentials. Please check your email and password.");
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
@@ -139,11 +139,6 @@ export default function LoginScreen() {
               </>
             )}
           </Pressable>
-
-          <View style={styles.demoHint}>
-            <Feather name="info" size={12} color={Colors.textTertiary} />
-            <Text style={styles.demoText}>Demo: arjun.sharma@college.edu / tech123</Text>
-          </View>
         </View>
 
         <View style={styles.footer}>
