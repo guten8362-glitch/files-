@@ -1,3 +1,4 @@
+/* @react-compiler-skip */
 import React from "react";
 import {
   Platform,
@@ -6,7 +7,10 @@ import {
   StyleSheet,
   Text,
   View,
+  ImageBackground,
+  Alert,
 } from "react-native";
+import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -24,7 +28,7 @@ function formatTime(date: Date): string {
 
 export default function PrinterDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { printers } = useApp();
+  const { printers, updatePrinter } = useApp();
   const insets = useSafeAreaInsets();
 
   const printer = printers.find(p => p.id === id);
@@ -42,6 +46,19 @@ export default function PrinterDetailScreen() {
       printer.status === "Offline" ? Colors.statusOffline : Colors.priorityMedium;
 
   const daysSinceService = Math.floor((Date.now() - printer.lastServiced.getTime()) / (24 * 60 * 60 * 1000));
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      updatePrinter(printer.id, { shopImage: result.assets[0].uri });
+    }
+  };
 
   return (
     <View style={styles.root}>
@@ -64,17 +81,24 @@ export default function PrinterDetailScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.printerHero}>
-          <View style={styles.printerIconLarge}>
-            <Feather name="printer" size={40} color={Colors.primary} />
+        <ImageBackground 
+          source={{ uri: printer.shopImage || "https://images.unsplash.com/photo-1560205001-a7fedfbfa4d7?auto=format&fit=crop&q=80&w=800" }} 
+          style={styles.heroBackground}
+        >
+          <View style={styles.heroOverlay}>
+            <View style={styles.heroContent}>
+              <Text style={styles.shopNameLarge}>{printer.shopName || "Unnamed Shop"}</Text>
+              <Text style={styles.printerIdHero}>{printer.printerId} • {printer.model}</Text>
+              <View style={styles.locationChipHero}>
+                <Feather name="map-pin" size={12} color={Colors.white} />
+                <Text style={styles.locationTextHero}>{printer.location}</Text>
+              </View>
+            </View>
+            <Pressable style={styles.editPhotoBtn} onPress={pickImage}>
+              <Feather name="camera" size={18} color={Colors.white} />
+            </Pressable>
           </View>
-          <Text style={styles.printerId}>{printer.printerId}</Text>
-          <Text style={styles.printerModel}>{printer.model}</Text>
-          <View style={styles.locationChip}>
-            <Feather name="map-pin" size={12} color={Colors.primary} />
-            <Text style={styles.locationText}>{printer.location}</Text>
-          </View>
-        </View>
+        </ImageBackground>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Consumables</Text>
@@ -224,46 +248,61 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 20,
+    paddingBottom: 20,
     gap: 24,
   },
-  printerHero: {
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 8,
+  heroBackground: {
+    width: '100%',
+    height: 240,
   },
-  printerIconLarge: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
-    backgroundColor: Colors.primaryUltraLight,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 4,
+  heroOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+    padding: 24,
   },
-  printerId: {
-    fontSize: 24,
+  heroContent: {
+    gap: 4,
+  },
+  shopNameLarge: {
+    fontSize: 28,
     fontFamily: "Inter_700Bold",
-    color: Colors.text,
+    color: Colors.white,
+    letterSpacing: -0.5,
   },
-  printerModel: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
+  printerIdHero: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: 'rgba(255,255,255,0.8)',
   },
-  locationChip: {
+  locationChipHero: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: Colors.primaryUltraLight,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 20,
+    alignSelf: "flex-start",
+    marginTop: 8,
   },
-  locationText: {
+  locationTextHero: {
     fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    color: Colors.primary,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.white,
+  },
+  editPhotoBtn: {
+    position: 'absolute',
+    top: 24,
+    right: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   section: {
     gap: 12,

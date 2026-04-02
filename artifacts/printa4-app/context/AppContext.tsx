@@ -58,7 +58,9 @@ interface AppContextType {
   addPrinter: (
     printer: Omit<PrinterHealth, "id" | "errorHistory" | "status" | "paperLevel" | "lastServiced">
   ) => void;
+  updatePrinter: (id: string, data: Partial<PrinterHealth>) => void;
   refreshData: () => Promise<void>;
+  bypassLogin: () => Promise<void>;
 }
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
@@ -150,13 +152,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [printers,    setPrinters]    = useState<PrinterHealth[]>([]);
   const [isLoading,   setIsLoading]   = useState(true);
+  const [sessionSecret, setSessionSecret] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Fetch live data ────────────────────────────────────────────────────────
   const refreshData = async () => {
     try {
-      // Tasks
-      const taskDocs = await listDocuments("tasks_collection");
+      // Use the sessionSecret from state if available
+      const currentSession = await AsyncStorage.getItem("sessionSecret") || sessionSecret || undefined;
+
+      // 1. Tasks
+      const taskDocs = await listDocuments("tasks_collection", currentSession);
       console.log("[AppContext] tasks fetched:", taskDocs.length);
       const rawTasks = taskDocs.map(mapTask);
       rawTasks.sort((a, b) =>
@@ -167,12 +173,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setTasks(rawTasks);
 
       // 2. Printers
-      const pDocs = await listDocuments("printers");
+      const pDocs = await listDocuments("printers", currentSession);
       console.log("[AppContext] printers fetched:", pDocs.length);
       setPrinters(pDocs.map(mapPrinter));
 
       // 3. Technicians (Users)
-      const uDocs = await listDocuments("users_collection");
+      const uDocs = await listDocuments("users_collection", currentSession);
       console.log("[AppContext] technicians fetched:", uDocs.length);
       setTechnicians(uDocs.map(mapTechnician));
     } catch (err) {
@@ -192,14 +198,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const init = async () => {
       try {
-        const stored = await AsyncStorage.getItem("currentUser");
-        if (stored) {
-          setCurrentUser(JSON.parse(stored));
-          setIsLoggedIn(true);
+        const storedUser = await AsyncStorage.getItem("currentUser");
+        const storedSession = await AsyncStorage.getItem("sessionSecret");
+        
+        if (storedSession) {
+          const { getAccount } = await import("@/lib/appwrite");
+          const account = await getAccount(storedSession);
+          
+          if (account) {
+            setSessionSecret(storedSession);
+            if (storedUser) {
+              setCurrentUser(JSON.parse(storedUser));
+              setIsLoggedIn(true);
+            } else {
+              // Re-fetch user details if missing
+              setCurrentUser({
+                id: account.$id,
+                name: account.name,
+                email: account.email,
+                role: account.email.includes("admin") ? "Senior Technician" : "Technician"
+              });
+              setIsLoggedIn(true);
+            }
+          } else {
+            // Session expired
+            await AsyncStorage.multiRemove(["currentUser", "sessionSecret"]);
+          }
         }
-      } catch {}
-      await refreshData();
-      startPolling();
+      } catch (err) {
+        console.error("[AppContext] init error:", err);
+      } finally {
+        await refreshData();
+        startPolling();
+      }
     };
     init();
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
@@ -207,32 +238,76 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Check against fetched technicians from users_collection
-    const tech = technicians.find(
-      t => t.email.toLowerCase() === email.toLowerCase()
-    );
-    
-    // For now, allow 'tech123' or 'admin123' as password if tech exists
-    // (In production, use Appwrite Auth proper)
-    if (tech && (password === "tech123" || password === "admin123")) {
-      const user: CurrentUser = { 
-        id: tech.id, 
-        name: tech.name, 
-        email: tech.email, 
-        role: tech.email.includes("admin") ? "Senior Technician" : "Technician" 
-      };
-      setCurrentUser(user);
-      setIsLoggedIn(true);
-      await AsyncStorage.setItem("currentUser", JSON.stringify(user));
-      return true;
+    try {
+      const { createSession, getAccount } = await import("@/lib/appwrite");
+      
+      // 1. Create real Appwrite session
+      const session = await createSession(email, password);
+      const secret = session.secret || session.$id; // Depending on SDK version/platform
+      
+      // 2. Get account details to verify technician mapping
+      const account = await getAccount(secret);
+      
+      if (account) {
+        const user: CurrentUser = { 
+          id: account.$id, 
+          name: account.name, 
+          email: account.email, 
+          role: account.email.includes("admin") ? "Senior Technician" : "Technician" 
+        };
+        
+        setSessionSecret(secret);
+        setCurrentUser(user);
+        setIsLoggedIn(true);
+        
+        await AsyncStorage.setItem("currentUser", JSON.stringify(user));
+        await AsyncStorage.setItem("sessionSecret", secret);
+        
+        // Refresh with auth header
+        await refreshData();
+        return true;
+      }
+    } catch (err: any) {
+      console.error("[AppContext] Login failed:", err.message);
+      // alert(err.message); // Could be shown in UI
     }
     return false;
   };
 
   const logout = async () => {
+    try {
+      if (sessionSecret) {
+        const { deleteSession } = await import("@/lib/appwrite");
+        await deleteSession(sessionSecret);
+      }
+    } catch (err) {
+      console.error("[AppContext] Logout backend failed:", err);
+    }
+    
+    setSessionSecret(null);
     setCurrentUser(null);
     setIsLoggedIn(false);
-    await AsyncStorage.removeItem("currentUser");
+    await AsyncStorage.multiRemove(["currentUser", "sessionSecret"]);
+  };
+
+  const bypassLogin = async () => {
+    const guestUser: CurrentUser = {
+      id: "guest_123",
+      name: "Guest Technician",
+      email: "guest@college.edu",
+      role: "Senior Technician"
+    };
+    
+    const mockSecret = "bypass_token_" + Date.now();
+    setSessionSecret(mockSecret);
+    setCurrentUser(guestUser);
+    setIsLoggedIn(true);
+    
+    await AsyncStorage.setItem("currentUser", JSON.stringify(guestUser));
+    await AsyncStorage.setItem("sessionSecret", mockSecret);
+    
+    // Attempt to refresh data, although it may fail if backend rules are strict
+    refreshData();
   };
 
   // ── Task mutations ─────────────────────────────────────────────────────────
@@ -245,7 +320,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         : t
     ));
     try {
-      await updateDocument("tasks_collection", taskId, { employeeId: currentUser.id });
+      const currentSession = await AsyncStorage.getItem("sessionSecret") || sessionSecret || undefined;
+      await updateDocument("tasks_collection", taskId, { employeeId: currentUser.id }, currentSession);
     } catch (e) {
       console.error("[takeTask] failed:", e);
       refreshData();
@@ -257,11 +333,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const completeTask = async (taskId: string, notes?: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    
     setTasks(prev => prev.map(t =>
       t.id === taskId ? { ...t, status: "Completed", completedAt: new Date(), notes } : t
     ));
+
     try {
-      await updateDocument("tasks_collection", taskId, { status: "DONE", notes: notes ?? "" });
+      const currentSession = await AsyncStorage.getItem("sessionSecret") || sessionSecret || undefined;
+      
+      // 1. Update task in Appwrite
+      await updateDocument("tasks_collection", taskId, { status: "DONE", notes: notes ?? "" }, currentSession);
+
+      // 2. Synchronize Printer Health if task is completed
+      if (task?.printerId) {
+        const printer = printers.find(p => p.printerId === task.printerId);
+        if (printer) {
+          const isPaperIssue = ["No Paper", "Paper Empty", "Low Paper"].includes(task.issueType);
+          const printerUpdate: Partial<PrinterHealth> = {
+            lastServiced: new Date(),
+            ...(isPaperIssue ? { paperLevel: 100, status: "Online" } : {})
+          };
+
+          // Optimistic update of printer state
+          setPrinters(prev => prev.map(p => 
+            p.printerId === task.printerId ? { ...p, ...printerUpdate } : p
+          ));
+
+          // Persist printer health change to Appwrite
+          await updateDocument("printers", printer.id, printerUpdate, currentSession);
+        }
+      }
     } catch (e) {
       console.error("[completeTask] failed:", e);
       refreshData();
@@ -306,11 +408,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updatePrinter = async (id: string, data: Partial<PrinterHealth>) => {
+    setPrinters(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+    try {
+      const currentSession = await AsyncStorage.getItem("sessionSecret") || sessionSecret || undefined;
+      await updateDocument("printers", id, data, currentSession);
+    } catch (e) {
+      console.error("[updatePrinter] failed:", e);
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       currentUser, isLoggedIn, tasks, technicians, printers, isLoading,
       login, logout, takeTask, updateTaskStatus, completeTask,
-      requestAssistance, addPrinter, refreshData,
+      requestAssistance, addPrinter, updatePrinter, refreshData, bypassLogin,
     }}>
       {children}
     </AppContext.Provider>

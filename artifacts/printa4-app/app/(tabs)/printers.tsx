@@ -34,6 +34,7 @@ function PrinterCard({ printer }: { printer: PrinterHealth }) {
           <Feather name="printer" size={20} color={Colors.primary} />
         </View>
         <View style={styles.printerInfo}>
+          <Text style={styles.shopName} numberOfLines={1}>{printer.shopName || "Unnamed Shop"}</Text>
           <Text style={styles.printerId}>{printer.printerId}</Text>
           <View style={styles.locationRow}>
             <Feather name="map-pin" size={10} color={Colors.textTertiary} />
@@ -96,12 +97,6 @@ export default function PrintersScreen() {
   const { printers, addPrinter, currentUser, technicians } = useApp();
   const insets = useSafeAreaInsets();
   
-  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
-  const [newPrinterData, setNewPrinterData] = useState({
-    printerId: "", location: "", model: "", shopName: "", ownerName: "", ownerPhone: "", 
-    maxPaperCapacity: "500", printedCount: "0", latitude: "12.9716", longitude: "77.5946", shopImage: "",
-  });
-
   const filteredPrinters = currentUser?.role === "Senior Technician" 
     ? printers 
     : printers.filter(p => !p.assignedTechnicianId || p.assignedTechnicianId === currentUser?.id);
@@ -110,50 +105,7 @@ export default function PrintersScreen() {
   const offline = filteredPrinters.filter(p => p.status === "Offline").length;
   const warning = filteredPrinters.filter(p => p.status === "Warning").length;
 
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [16, 9],
-      quality: 0.8,
-    });
 
-    if (!result.canceled) {
-      setNewPrinterData({...newPrinterData, shopImage: result.assets[0].uri});
-    }
-  };
-
-  const handleAddPrinter = () => {
-    if (!newPrinterData.printerId.trim() || !newPrinterData.location.trim()) {
-      Alert.alert("Missing Info", "Please fill in essential fields (Printer ID and Location).");
-      return;
-    }
-    
-    addPrinter({
-      printerId: newPrinterData.printerId,
-      location: newPrinterData.location,
-      model: newPrinterData.model || "Unknown Model",
-      building: "Main Campus",
-      floor: "Location",
-      shopName: newPrinterData.shopName || "Unnamed Shop",
-      ownerName: newPrinterData.ownerName || "Unknown Owner",
-      ownerPhone: newPrinterData.ownerPhone || "N/A",
-      maxPaperCapacity: parseInt(newPrinterData.maxPaperCapacity) || 500,
-      printedCount: parseInt(newPrinterData.printedCount) || 0,
-      latitude: parseFloat(newPrinterData.latitude) || 12.0,
-      longitude: parseFloat(newPrinterData.longitude) || 77.0,
-      shopImage: newPrinterData.shopImage || "https://images.unsplash.com/photo-1560205001-a7fedfbfa4d7?auto=format&fit=crop&q=80&w=400",
-      assignedTechnicianId: currentUser?.id || "t1",
-      assignedTechnicianName: currentUser?.name || "Unassigned",
-      inkLevel: 100,
-    });
-    
-    setNewPrinterData({
-      printerId: "", location: "", model: "", shopName: "", ownerName: "", ownerPhone: "", 
-      maxPaperCapacity: "500", printedCount: "0", latitude: "12.9716", longitude: "77.5946", shopImage: "",
-    });
-    setIsAddModalVisible(false);
-  };
 
   return (
     <View style={styles.root}>
@@ -163,13 +115,6 @@ export default function PrintersScreen() {
             <Text style={styles.title}>Printer Health</Text>
             <Text style={styles.subtitle}>{filteredPrinters.length} printers monitored</Text>
           </View>
-          <Pressable 
-            style={styles.addPrinterBtn}
-            onPress={() => setIsAddModalVisible(true)}
-          >
-            <Feather name="plus" size={16} color={Colors.white} />
-            <Text style={styles.addPrinterBtnText}>Add</Text>
-          </Pressable>
         </View>
 
         <View style={styles.statsRow}>
@@ -202,87 +147,7 @@ export default function PrintersScreen() {
         showsVerticalScrollIndicator={false}
       />
 
-      {/* Add Printer Modal */}
-      <Modal visible={isAddModalVisible} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add New Printer</Text>
-              <Pressable onPress={() => setIsAddModalVisible(false)} style={styles.closeBtn}>
-                <Feather name="x" size={20} color={Colors.textSecondary} />
-              </Pressable>
-            </View>
 
-            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Hardware Details</Text>
-                <TextInput 
-                  style={styles.input} 
-                  placeholder="Printer ID (e.g. PRN-999)" 
-                  value={newPrinterData.printerId} 
-                  onChangeText={txt => setNewPrinterData({...newPrinterData, printerId: txt})} 
-                  placeholderTextColor={Colors.textTertiary}
-                />
-                <TextInput 
-                  style={styles.input} 
-                  placeholder="Model (e.g. HP LaserJet)" 
-                  value={newPrinterData.model} 
-                  onChangeText={txt => setNewPrinterData({...newPrinterData, model: txt})} 
-                  placeholderTextColor={Colors.textTertiary}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Location & Shop Info</Text>
-                <TextInput 
-                  style={styles.input} 
-                  placeholder="Location (e.g. Lab 4)" 
-                  value={newPrinterData.location} 
-                  onChangeText={txt => setNewPrinterData({...newPrinterData, location: txt})} 
-                  placeholderTextColor={Colors.textTertiary}
-                />
-                <TextInput style={styles.input} placeholder="Shop/Kiosk Name" value={newPrinterData.shopName} onChangeText={txt => setNewPrinterData({...newPrinterData, shopName: txt})} placeholderTextColor={Colors.textTertiary} />
-                <TextInput style={styles.input} placeholder="Owner Name" value={newPrinterData.ownerName} onChangeText={txt => setNewPrinterData({...newPrinterData, ownerName: txt})} placeholderTextColor={Colors.textTertiary} />
-                <TextInput style={styles.input} placeholder="Owner Phone" value={newPrinterData.ownerPhone} onChangeText={txt => setNewPrinterData({...newPrinterData, ownerPhone: txt})} placeholderTextColor={Colors.textTertiary} keyboardType="phone-pad" />
-                
-                <View style={[styles.formGroup, { marginTop: 4 }]}>
-                  <Text style={styles.formLabel}>Shop Image</Text>
-                  {newPrinterData.shopImage ? (
-                    <View style={styles.imagePreviewContainer}>
-                      <Image source={{ uri: newPrinterData.shopImage }} style={styles.imagePreview} />
-                      <Pressable style={styles.changeImageBtn} onPress={pickImage}>
-                        <Feather name="edit-2" size={14} color={Colors.white} />
-                        <Text style={styles.changeImageText}>Change</Text>
-                      </Pressable>
-                    </View>
-                  ) : (
-                    <Pressable style={styles.photoBtn} onPress={pickImage}>
-                      <Feather name="image" size={20} color={Colors.primary} />
-                      <Text style={styles.photoBtnText}>Upload Shop Photo</Text>
-                    </Pressable>
-                  )}
-                </View>
-
-              </View>
-
-              <View style={styles.rowInputs}>
-                <View style={[styles.formGroup, {flex: 1}]}>
-                  <Text style={styles.formLabel}>Max Capacity</Text>
-                  <TextInput style={styles.input} value={newPrinterData.maxPaperCapacity} onChangeText={txt => setNewPrinterData({...newPrinterData, maxPaperCapacity: txt})} keyboardType="number-pad" />
-                </View>
-                <View style={[styles.formGroup, {flex: 1}]}>
-                  <Text style={styles.formLabel}>Printed Count</Text>
-                  <TextInput style={styles.input} value={newPrinterData.printedCount} onChangeText={txt => setNewPrinterData({...newPrinterData, printedCount: txt})} keyboardType="number-pad" />
-                </View>
-              </View>
-
-              <Pressable style={styles.submitBtn} onPress={handleAddPrinter}>
-                <Text style={styles.submitBtnText}>Add Printer</Text>
-              </Pressable>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -390,12 +255,17 @@ const styles = StyleSheet.create({
   },
   printerInfo: {
     flex: 1,
-    gap: 3,
+    gap: 2,
   },
-  printerId: {
+  shopName: {
     fontSize: 16,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
+  },
+  printerId: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
   },
   locationRow: {
     flexDirection: "row",

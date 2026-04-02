@@ -23,7 +23,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const { login } = useApp();
+  const { login, bypassLogin } = useApp();
   const insets = useSafeAreaInsets();
 
   const handleLogin = async () => {
@@ -46,6 +46,19 @@ export default function LoginScreen() {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBypass = async () => {
+    setLoading(true);
+    try {
+      await bypassLogin();
+      if (Platform.OS !== "web") {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+      router.replace("/(tabs)/tasks");
     } finally {
       setLoading(false);
     }
@@ -78,7 +91,7 @@ export default function LoginScreen() {
           <Text style={styles.appSubtitle}>Maintenance Portal</Text>
           <View style={styles.divider} />
           <Text style={styles.welcomeText}>Welcome back, Technician</Text>
-          <Text style={styles.subText}>Sign in to access your maintenance dashboard</Text>
+          <Text style={styles.subText}>Sign in to access your maintenance tasks</Text>
         </View>
 
         <View style={styles.form}>
@@ -138,6 +151,13 @@ export default function LoginScreen() {
                 <Feather name="arrow-right" size={18} color={Colors.white} />
               </>
             )}
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [styles.bypassBtn, pressed && { backgroundColor: Colors.borderLight }]}
+            onPress={handleBypass}
+          >
+            <Text style={styles.bypassBtnText}>Bypass Login (Guest Mode)</Text>
           </Pressable>
         </View>
 
@@ -300,6 +320,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
     color: Colors.white,
+  },
+  bypassBtn: {
+    alignItems: "center",
+    justifyContent: "center",
+    height: 54,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    marginTop: 4,
+  },
+  bypassBtnText: {
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
   },
   demoHint: {
     flexDirection: "row",

@@ -1,5 +1,6 @@
-import React from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useRef } from "react";
+import { Platform, Pressable, StyleSheet, Text, View, Animated } from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
@@ -11,11 +12,10 @@ import { LiveTimer } from "./LiveTimer";
 interface Props {
   task: PrinterTask;
   onPress: () => void;
-  onTake?: () => void;
   currentUserId?: string;
   isSenior?: boolean;
   isPrinterAssignedToMe?: boolean;
-  isAiRecommended?: boolean;
+  onReassign?: () => void;
 }
 
 const ISSUE_ICONS: Record<string, string> = {
@@ -29,42 +29,57 @@ const ISSUE_ICONS: Record<string, string> = {
   "Maintenance Due": "settings",
 };
 
-export function TaskCard({ task, onPress, onTake, currentUserId, isSenior, isPrinterAssignedToMe, isAiRecommended }: Props) {
+export function TaskCard({ task, onPress, currentUserId, isSenior, isPrinterAssignedToMe, onReassign }: Props) {
   const isUnassigned = !task.assignedTechnicianId;
   const isMyTask = task.assignedTechnicianId === currentUserId;
   const isOverdue = task.takenAt ? (Date.now() - task.takenAt.getTime()) > 30 * 60 * 1000 : false;
 
-  const handleTake = () => {
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const swipeableRef = useRef<Swipeable>(null);
+
+  const renderLeftActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+    const scale = dragX.interpolate({
+      inputRange: [0, 80],
+      outputRange: [0.5, 1],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <View style={styles.shareActionContainer}>
+        <Animated.View style={[styles.shareActionContent, { transform: [{ scale }] }]}>
+          <Feather name="share" size={24} color={Colors.white} />
+          <Text style={styles.shareActionText}>Share</Text>
+        </Animated.View>
+      </View>
+    );
+  };
+
+  const handleSwipeOpen = (direction: 'left' | 'right') => {
+    if (direction === 'left' && onReassign) {
+      setTimeout(() => {
+        swipeableRef.current?.close();
+        onReassign();
+      }, 150);
     }
-    onTake?.();
   };
 
   return (
-    <Pressable
+    <Swipeable
+      ref={swipeableRef}
+      renderLeftActions={onReassign ? renderLeftActions : undefined}
+      onSwipeableOpen={handleSwipeOpen}
+      leftThreshold={80}
+      containerStyle={styles.swipeContainer}
+      enabled={!!onReassign}
+    >
+      <Pressable
       style={({ pressed }) => [
         styles.card, 
-        isAiRecommended && styles.aiCard,
         pressed && styles.cardPressed
       ]}
       onPress={onPress}
     >
-      {isAiRecommended && (
-        <View style={styles.aiBanner}>
-          <Feather name="zap" size={12} color={Colors.white} />
-          <Text style={styles.aiBannerText}>✨ AI Recommended Next Stop</Text>
-        </View>
-      )}
 
-      {task.customerWaiting && !isAiRecommended && (
-        <View style={styles.waitingBanner}>
-          <Feather name="user" size={10} color={Colors.white} />
-          <Text style={styles.waitingText}>Customer Waiting</Text>
-        </View>
-      )}
-
-      {task.customerWaiting && isAiRecommended && (
+      {task.customerWaiting && (
         <View style={styles.waitingBanner}>
           <Feather name="user" size={10} color={Colors.white} />
           <Text style={styles.waitingText}>Customer Waiting</Text>
@@ -121,19 +136,7 @@ export function TaskCard({ task, onPress, onTake, currentUserId, isSenior, isPri
         </View>
       </View>
 
-      {isUnassigned && onTake && (isPrinterAssignedToMe || isSenior) && (
-        <Pressable style={styles.takeBtn} onPress={handleTake}>
-          <Feather name="check-circle" size={14} color={Colors.white} />
-          <Text style={styles.takeBtnText}>Take Task</Text>
-        </Pressable>
-      )}
 
-      {isUnassigned && onTake && !isPrinterAssignedToMe && !isSenior && (
-        <View style={styles.restrictedLabel}>
-          <Feather name="lock" size={12} color={Colors.textTertiary} />
-          <Text style={styles.restrictedText}>Assigned to another technician</Text>
-        </View>
-      )}
 
       {!isUnassigned && isMyTask && isOverdue && (
         <View style={styles.takeoverRow}>
@@ -141,16 +144,38 @@ export function TaskCard({ task, onPress, onTake, currentUserId, isSenior, isPri
           <Text style={styles.takeoverText}>Task delayed — consider escalation</Text>
         </View>
       )}
-    </Pressable>
+      </Pressable>
+    </Swipeable>
   );
 }
 
 const styles = StyleSheet.create({
+  swipeContainer: {
+    marginBottom: 10,
+    borderRadius: 16,
+    backgroundColor: Colors.primary, // Base for the share action
+  },
+  shareActionContainer: {
+    flex: 1,
+    backgroundColor: Colors.primary, // The "blue" requested by the user
+    justifyContent: 'center',
+    borderRadius: 16,
+    paddingLeft: 24,
+  },
+  shareActionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  shareActionText: {
+    color: Colors.white,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 16,
+  },
   card: {
     backgroundColor: Colors.white,
     borderRadius: 16,
     padding: 14,
-    marginBottom: 10,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
     shadowColor: Colors.shadow,

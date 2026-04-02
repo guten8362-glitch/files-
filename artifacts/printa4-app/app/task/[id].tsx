@@ -1,3 +1,4 @@
+/* @react-compiler-skip */
 import React, { useState } from "react";
 import {
   Alert,
@@ -8,6 +9,7 @@ import {
   TextInput,
   View,
   Image,
+  Text,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Feather } from "@expo/vector-icons";
@@ -19,6 +21,7 @@ import { PriorityBadge } from "@/components/PriorityBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { LiveTimer } from "@/components/LiveTimer";
 import { TaskMap } from "@/components/TaskMap";
+import { LevelBar } from "@/components/LevelBar";
 
 const QUICK_FIX_ISSUES = ["Paper Jam", "Paper Empty"];
 
@@ -61,7 +64,6 @@ export default function TaskDetailScreen() {
   const isPrinterAssignedToMe = printer?.assignedTechnicianId === currentUser?.id;
   const isSenior = currentUser?.role === "Senior Technician";
   
-  const canAct = task.assignedTechnicianId ? isMyTask : (isPrinterAssignedToMe || isSenior);
   const nextStatus = STATUS_FLOW[task.status];
 
   let displayIssue = task.issueType as string;
@@ -74,7 +76,8 @@ export default function TaskDetailScreen() {
     }
 
     if (task.status === "Unassigned") {
-      takeTask(task.id);
+      // Do nothing, take task is removed
+      return;
     } else if (task.status === "Fixing" || (nextStatus === "Completed")) {
       Alert.alert(
         "Complete Task",
@@ -158,10 +161,21 @@ export default function TaskDetailScreen() {
               <InfoRow icon="map-pin" label="Coords" value={`${printer?.latitude || 0}, ${printer?.longitude || 0}`} />
             )}
             
-            <View style={[styles.divider, { marginVertical: 4 }]} />
-            
-            <InfoRow icon="building" label="Building" value={task.building} />
+            <InfoRow icon="home" label="Building" value={task.building} />
             <InfoRow icon="layers" label="Floor" value={task.floor} />
+
+            <View style={styles.divider} />
+            <Text style={styles.healthHeader}>Printer Health Status</Text>
+            
+            <View style={styles.healthCard}>
+              <LevelBar label="Paper Level" value={printer?.paperLevel || 0} />
+              <View style={styles.infoDivider} />
+              <InfoRow 
+                icon="calendar" 
+                label="Last Service" 
+                value={printer?.lastServiced ? printer.lastServiced.toLocaleDateString("en-IN") : "N/A"} 
+              />
+            </View>
           </View>
 
           <View style={styles.divider} />
@@ -200,7 +214,7 @@ export default function TaskDetailScreen() {
           )}
         </View>
 
-        {task.status !== "Completed" && canAct && (task.status === "Fixing" || task.status === "Assigned" || task.status === "On the way") && (
+        {task.status !== "Completed" && (task.status === "Fixing" || task.status === "Assigned" || task.status === "On the way") && (
           <View style={styles.fixSection}>
             <Text style={styles.fixTitle}>Fix Mode</Text>
 
@@ -287,28 +301,26 @@ export default function TaskDetailScreen() {
         )}
       </ScrollView>
 
-      {task.status !== "Completed" && canAct && nextStatus !== null && (
+      {task.status !== "Completed" && task.status !== "Unassigned" && nextStatus !== null && (
         <View style={[styles.actionBar, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 16) }]}>
           <Pressable
             style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.9 }]}
             onPress={handleAction}
           >
             <Feather
-              name={task.status === "Unassigned" ? "check-circle" : task.status === "Fixing" ? "flag" : "arrow-right"}
+              name={task.status === "Fixing" ? "flag" : "arrow-right"}
               size={20}
               color={Colors.white}
             />
             <Text style={styles.actionBtnText}>{STATUS_ACTIONS[task.status]}</Text>
           </Pressable>
 
-          {task.status !== "Unassigned" && (
-            <Pressable
-              style={styles.escalateBtn}
-              onPress={() => router.push("/assistance")}
-            >
-              <Feather name="phone-call" size={18} color={Colors.priorityHigh} />
-            </Pressable>
-          )}
+          <Pressable
+            style={styles.escalateBtn}
+            onPress={() => router.push("/assistance")}
+          >
+            <Feather name="phone-call" size={18} color={Colors.priorityHigh} />
+          </Pressable>
         </View>
       )}
     </View>
@@ -456,6 +468,25 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
     flex: 1,
+  },
+  healthHeader: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  healthCard: {
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    padding: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  infoDivider: {
+    height: 1,
+    backgroundColor: Colors.borderLight,
   },
   shopImage: {
     width: "100%",
