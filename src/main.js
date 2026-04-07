@@ -261,7 +261,16 @@ export default async ({ req, res, log, error }) => {
 
     const path = req.path;
     const method = req.method;
-    const payload = req.bodyJson; // Appwrite runtime parses JSON for us
+    
+    // Safely parse payload only for methods that use bodies
+    let payload = {};
+    if (method === 'POST' || method === 'PUT') {
+        try {
+            payload = req.bodyJson || {};
+        } catch (e) {
+            payload = {}; // Fallback if JSON is invalid or empty
+        }
+    }
 
     log(`🚀 Incoming: ${method} ${path}`);
 
