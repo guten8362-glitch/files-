@@ -2,7 +2,7 @@
   "name": "appwrite-printer-backend",
   "version": "1.0.0",
   "description": "Appwrite Printer Maintenance Backend API in Node.js",
-  "main": "index.js",
+  "main": "src/main.js",
   "type": "module",
   "dependencies": {
     "node-appwrite": "^14.0.0"
