@@ -8,8 +8,10 @@ import { Client, Databases, Messaging, ID, Query } from 'node-appwrite';
 const DatabaseId = "69cbdded00392d03962c";
 const TasksCollection = "tasks_collection";
 const PrintersCollection = "printers";
-const UsersCollection = "users_collection";
+const UsersCollection = "users";
 const HistoryCollection = "history_collection";
+const ShopsCollection = "shops";
+const MaintenanceCollection = "maintenance";
 
 /*
  * ---------------------------------------------------------
@@ -17,48 +19,44 @@ const HistoryCollection = "history_collection";
  * ---------------------------------------------------------
  */
 function determinePriority(issues) {
-    if (!issues || issues.length === 0) return "LOW";
+    if (!issues || issues.length === 0) return 7; // Default to lowest
     
-    // High priority signals
-    const highSignals = ["Paper Jam", "No Paper"];
-    if (issues.some(issue => highSignals.includes(issue))) {
-        return "HIGH";
-    }
+    const issuesJoined = issues.join(" ").toLowerCase();
 
-    // Medium priority signals
-    const mediumSignals = ["Ink Low", "Low Paper"];
-    if (issues.some(issue => mediumSignals.includes(issue))) {
-        return "MEDIUM";
-    }
+    if (issuesJoined.includes("no paper")) return 1;
+    if (issuesJoined.includes("service requested")) return 2;
+    if (issuesJoined.includes("printer jammed") || issuesJoined.includes("paper jam")) return 3;
+    if (issuesJoined.includes("door opened")) return 4;
+    if (issuesJoined.includes("no ink") || issuesJoined.includes("ink low")) return 5;
+    if (issuesJoined.includes("printer offline")) return 6;
 
-    return "LOW";
+    return 7;
 }
 
 function determineDeadline(priority, fromDate = new Date()) {
     const deadline = new Date(fromDate);
-    switch (priority) {
-        case "HIGH":
-            deadline.setMinutes(deadline.getMinutes() + 5);
-            break;
-        case "MEDIUM":
-            deadline.setMinutes(deadline.getMinutes() + 15);
-            break;
-        case "LOW":
-        default:
-            deadline.setMinutes(deadline.getMinutes() + 30);
-            break;
-    }
+    // Deadlines in minutes based on priority rank (1-7)
+    const weights = {
+        1: 5,   // No Paper: 5 mins
+        2: 10,  // Service: 10 mins
+        3: 15,  // Jammed: 15 mins
+        4: 20,  // Door: 20 mins
+        5: 30,  // No Ink: 30 mins
+        6: 45,  // Offline: 45 mins
+        7: 60   // Other: 1 hour
+    };
+
+    const minutes = weights[priority] || 60;
+    deadline.setMinutes(deadline.getMinutes() + minutes);
     return deadline.toISOString();
 }
 
 function sortTasks(tasks) {
-    const priorityWeight = { "HIGH": 3, "MEDIUM": 2, "LOW": 1 };
-
     return tasks.sort((a, b) => {
-        // Priority weight first
-        const pi = priorityWeight[a.priority] || 0;
-        const pj = priorityWeight[b.priority] || 0;
-        if (pi !== pj) return pj - pi;
+        // Priority rank first (lower number = higher priority)
+        const pi = Number(a.priority) || 7;
+        const pj = Number(b.priority) || 7;
+        if (pi !== pj) return pi - pj;
 
         // Deadline second
         const di = new Date(a.deadline).getTime();
@@ -98,50 +96,16 @@ async function createTask(db, msg, log, payload) {
         throw new Error("printerId and issues are required.");
     }
 
-    const now = new Date();
-    const priority = determinePriority(issues);
-    const deadline = determineDeadline(priority, now);
-
     const taskData = {
         printerId,
         issues,
-        priority,
-        createdAt: now.toISOString(),
-        deadline,
+        createdAt: new Date().toISOString(),
         status: "ACTIVE",
+        priority: "PENDING", // Will be updated by event handler
         shared: false
     };
 
     const doc = await db.createDocument(DatabaseId, TasksCollection, ID.unique(), taskData);
-
-    // Fire alarm if HIGH priority
-    if (priority === "HIGH") {
-        log("🔥 High priority task detected! Sending notifications...");
-        try {
-            // Find technicians/admins
-            const usersResp = await db.listDocuments(DatabaseId, UsersCollection, [
-                Query.or([
-                    Query.equal('role', 'technician'),
-                    Query.equal('role', 'admin')
-                ])
-            ]);
-
-            const technicianIds = usersResp.documents.map(u => u.$id);
-            
-            if (technicianIds.length > 0) {
-                await msg.createPush(
-                    ID.unique(),
-                    "🚨 High Priority Alarm",
-                    `Urgent printer issue: ${issues.join(", ")}`,
-                    [], // topics
-                    technicianIds // users
-                );
-            }
-        } catch (err) {
-            log(`Notification Error: ${err.message}`);
-        }
-    }
-
     return { success: true, data: doc };
 }
 
@@ -165,31 +129,47 @@ async function saveToken(db, log, payload) {
     return { success: true };
 }
 
-// Complete a task and update technician stats
+// Complete a task (HTTP shortcut)
 async function completeTask(db, taskId, payload) {
     const { employeeId } = payload;
     
-    const task = await db.getDocument(DatabaseId, TasksCollection, taskId);
-    const createdAt = new Date(task.createdAt || task.$createdAt);
-    const resolvedAt = new Date();
-    const timeTaken = Math.floor((resolvedAt - createdAt) / (1000 * 60)); // Minutes
-
-    // 1. Log to history
-    await db.createDocument(DatabaseId, HistoryCollection, ID.unique(), {
-        taskId: task.$id,
-        employeeId,
-        printerId: task.printerId,
-        issues: task.issues,
-        resolvedAt: resolvedAt.toISOString(),
-        timeTaken
+    // Simply mark as DONE. The Event Handler will pick this up and
+    // handle stats/history logging automatically.
+    await db.updateDocument(DatabaseId, TasksCollection, taskId, { 
+        status: "DONE",
+        employeeId: employeeId
     });
 
-    // 2. Mark task as DONE
-    await db.updateDocument(DatabaseId, TasksCollection, taskId, { status: "DONE" });
+    return { success: true, message: "Task completion triggered" };
+}
 
-    // 3. Update technician stats
-    if (employeeId) {
-        try {
+// Logic to process completion (called by Event Handler)
+async function processTaskCompletion(db, taskId, employeeId, log) {
+    try {
+        const task = await db.getDocument(DatabaseId, TasksCollection, taskId);
+        
+        // Skip if already processed into history
+        const existingHistory = await db.listDocuments(DatabaseId, HistoryCollection, [
+            Query.equal('taskId', taskId)
+        ]);
+        if (existingHistory.total > 0) return;
+
+        const createdAt = new Date(task.createdAt || task.$createdAt);
+        const resolvedAt = new Date();
+        const timeTaken = Math.floor((resolvedAt - createdAt) / (1000 * 60));
+
+        // 1. Log to history
+        await db.createDocument(DatabaseId, HistoryCollection, ID.unique(), {
+            taskId: task.$id,
+            employeeId,
+            printerId: task.printerId,
+            issues: task.issues,
+            resolvedAt: resolvedAt.toISOString(),
+            timeTaken
+        });
+
+        // 2. Update stats
+        if (employeeId) {
             const user = await db.getDocument(DatabaseId, UsersCollection, employeeId);
             const newTotal = (user.totalTasks || 0) + 1;
             const newAvg = Math.floor((((user.avgResponseTime || 0) * (user.totalTasks || 0)) + timeTaken) / newTotal);
@@ -198,13 +178,10 @@ async function completeTask(db, taskId, payload) {
                 totalTasks: newTotal,
                 avgResponseTime: newAvg
             });
-        } catch (err) {
-            // Log error but don't fail task completion
-            console.error(`Stats Update Error: ${err.message}`);
         }
+    } catch (err) {
+        log(`Stats Error: ${err.message}`);
     }
-
-    return { success: true, message: "Task completed" };
 }
 
 // Update printer status (Health check)
@@ -223,6 +200,44 @@ async function updatePrinter(db, payload) {
     return { success: true, message: "Printer updated successfully" };
 }
 
+// Get all shops
+async function getShops(db) {
+    const response = await db.listDocuments(DatabaseId, ShopsCollection);
+    return { success: true, data: response.documents };
+}
+
+// Get all maintenance records
+async function getMaintenance(db) {
+    const response = await db.listDocuments(DatabaseId, MaintenanceCollection);
+    return { success: true, data: response.documents };
+}
+
+// Create a maintenance record
+async function createMaintenance(db, payload) {
+    const { printer_id, startTime, error_type, printerFixed, employeeId, email } = payload;
+    if (!printer_id || !error_type) {
+        throw new Error("printer_id and error_type are required.");
+    }
+
+    const data = {
+        printer_id,
+        startTime: startTime || new Date().toISOString(),
+        error_type,
+        printerFixed: printerFixed || false,
+        employeeId,
+        email
+    };
+
+    const doc = await db.createDocument(DatabaseId, MaintenanceCollection, ID.unique(), data);
+    return { success: true, data: doc };
+}
+
+// Get all users
+async function getUsers(db) {
+    const response = await db.listDocuments(DatabaseId, UsersCollection);
+    return { success: true, data: response.documents };
+}
+
 // Get aggregate stats for a user
 async function getUserStats(db, payload) {
     const { employeeId } = payload;
@@ -232,11 +247,77 @@ async function getUserStats(db, payload) {
     return {
         success: true,
         data: {
-            totalTasks: user.totalTasks,
-            avgResponseTime: user.avgResponseTime,
-            successRate: user.successRate
+            totalTasks: user.totalTasks || 0,
+            avgResponseTime: user.avgResponseTime || 0,
+            successRate: user.successRate || 0,
+            email: user.email,
+            phone: user.phone
         }
     };
+}
+
+/*
+ * ---------------------------------------------------------
+ * EVENT HANDLER (REAL-TIME LOGIC)
+ * ---------------------------------------------------------
+ */
+
+async function handleEvent(db, msg, log, event, payload) {
+    log(`🔔 Event Triggered: ${event}`);
+
+    // Handle Task creation (Auto-calculate priority/deadline)
+    if (event.includes('collections.tasks_collection.documents.*.create')) {
+        const doc = payload;
+        if (!doc.priority || doc.priority === "PENDING") {
+            const priority = determinePriority(doc.issues);
+            const deadline = determineDeadline(priority, new Date(doc.$createdAt));
+            
+            log(`✨ Task Created: Calculating priority (${priority}) and deadline...`);
+            await db.updateDocument(DatabaseId, TasksCollection, doc.$id, {
+                priority,
+                deadline
+            });
+
+            // Send Push for Critical priority (Rank 1-3)
+            if (priority <= 3) {
+                await sendHighPriorityAlert(db, msg, log, doc.issues);
+            }
+        }
+    }
+
+    // Handle Task completion (Stats & History)
+    if (event.includes('collections.tasks_collection.documents.*.update')) {
+        const doc = payload;
+        // Check if just marked as DONE
+        if (doc.status === "DONE") {
+            log(`✅ Task ${doc.$id} marked DONE. Processing stats...`);
+            await processTaskCompletion(db, doc.$id, doc.employeeId, log);
+        }
+    }
+}
+
+async function sendHighPriorityAlert(db, msg, log, issues) {
+    try {
+        const usersResp = await db.listDocuments(DatabaseId, UsersCollection, [
+            Query.or([
+                Query.equal('role', 'technician'),
+                Query.equal('role', 'admin')
+            ])
+        ]);
+
+        const technicianIds = usersResp.documents.map(u => u.$id);
+        if (technicianIds.length > 0) {
+            await msg.createPush(
+                ID.unique(),
+                "🚨 High Priority Alarm",
+                `Urgent printer issue: ${issues.join(", ")}`,
+                [],
+                technicianIds
+            );
+        }
+    } catch (err) {
+        log(`Notification Error: ${err.message}`);
+    }
 }
 
 /*
@@ -245,12 +326,7 @@ async function getUserStats(db, payload) {
  * ---------------------------------------------------------
  */
 export default async ({ req, res, log, error }) => {
-    // 1. CORS Preflight
-    if (req.method === 'OPTIONS') {
-        return res.json({}, 200);
-    }
-
-    // 2. Initialize Appwrite Clients
+    // 1. Initialize Clients
     const client = new Client()
         .setEndpoint(process.env.APPWRITE_FUNCTION_ENDPOINT || 'https://cloud.appwrite.io/v1')
         .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
@@ -259,16 +335,31 @@ export default async ({ req, res, log, error }) => {
     const db = new Databases(client);
     const msg = new Messaging(client);
 
+    // 2. Detect Mode (Event vs HTTP)
+    const event = req.headers['x-appwrite-event'];
+    
+    if (event) {
+        try {
+            await handleEvent(db, msg, log, event, req.bodyJson);
+            return res.json({ success: true, message: "Event processed" });
+        } catch (err) {
+            error(`❌ Event Error: ${err.message}`);
+            return res.json({ success: false, error: err.message }, 500);
+        }
+    }
+
+    // 3. HTTP Path Routing
     const path = req.path;
     const method = req.method;
-    
-    // Safely parse payload only for methods that use bodies
+
+    if (method === 'OPTIONS') return res.json({}, 200);
+
     let payload = {};
     if (method === 'POST' || method === 'PUT') {
         try {
             payload = req.bodyJson || {};
         } catch (e) {
-            payload = {}; // Fallback if JSON is invalid or empty
+            payload = {};
         }
     }
 
@@ -288,6 +379,13 @@ export default async ({ req, res, log, error }) => {
                 responseData = { success: true, data: docs.documents };
             }
             if (method === 'PUT') responseData = await updatePrinter(db, payload);
+        } else if (path === '/shops' && method === 'GET') {
+            responseData = await getShops(db);
+        } else if (path === '/maintenance') {
+            if (method === 'GET') responseData = await getMaintenance(db);
+            if (method === 'POST') responseData = await createMaintenance(db, payload);
+        } else if (path === '/users' && method === 'GET') {
+            responseData = await getUsers(db);
         } else if (path === '/users/stats' && method === 'POST') {
             responseData = await getUserStats(db, payload);
         } else if (path.startsWith('/complete/') && method === 'PUT') {
@@ -302,7 +400,7 @@ export default async ({ req, res, log, error }) => {
         return res.json(responseData);
 
     } catch (err) {
-        error(`❌ Error Processing Request: ${err.message}`);
+        error(`❌ API Error: ${err.message}`);
         return res.json({ success: false, error: err.message }, 500);
     }
 };
