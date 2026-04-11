@@ -7,16 +7,20 @@
     "icon": "./assets/images/icon.png",
     "scheme": "print-tech-flow",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "ios": {
-      "supportsTablet": false
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.maintance",
+      "googleServicesFile": "./google-services.json"
     },
-    "android": {},
     "web": {
       "favicon": "./assets/images/icon.png"
     },
@@ -28,11 +32,20 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-notifications"
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": false,
+      "reactCompiler": false
+    },
+    "extra": {
+      "router": {
+        "origin": "https://replit.com/"
+      },
+      "eas": {
+        "projectId": "c93a4a4a-bb95-44dc-bd38-f23e5d98db6b"
+      }
     }
   }
 }

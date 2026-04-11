@@ -1,0 +1,10 @@
+{
+  "name": "printer-maintenance",
+  "version": "1.0.0",
+  "description": "Logic-heavy backend for Printer Maintenance tracking, sorting, and push notifications.",
+  "main": "src/main.js",
+  "devDependencies": {},
+  "dependencies": {
+    "node-appwrite": "^14.1.0"
+  }
+}

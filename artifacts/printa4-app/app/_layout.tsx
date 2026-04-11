@@ -44,6 +44,9 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
+      
+      // Request notification permissions on startup
+      import("@/services/notifications").then(m => m.registerForPushNotificationsAsync());
     }
   }, [fontsLoaded, fontError]);
 

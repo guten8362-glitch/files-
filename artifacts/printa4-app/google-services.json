@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "720499928653",
+    "project_id": "maintanenace",
+    "storage_bucket": "maintanenace.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:720499928653:android:d393ce469e2fb9ae1b3604",
+        "android_client_info": {
+          "package_name": "com.maintance"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEjDNS9ykjq20mhZwF2NAJL5TeABVKwpY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

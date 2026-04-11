@@ -1,9 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
-import { APPWRITE, listDocuments, updateDocument } from "@/lib/appwrite";
+import { APPWRITE, listDocuments, updateDocument, executeFunction, client } from "@/lib/appwrite";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-export type Priority = "High" | "Medium" | "Low";
+/** Numeric priority rank: 1 (highest urgency) → 7 (lowest / initializing) */
+export type Priority = number;
 export type TaskStatus =
   | "Unassigned" | "Assigned" | "On the way" | "Fixing" | "Completed";
 export type IssueType =
@@ -16,11 +17,13 @@ export interface Technician {
   id: string; name: string; email: string; status: TechnicianStatus;
   avatar: string; tasksCompleted: number; avgResponseTime: number;
   successRate: number; currentTasks: string[]; phone: string;
+  fcmToken?: string[];
 }
 
 export interface PrinterTask {
   id: string; printerId: string; location: string; issueType: IssueType;
-  priority: Priority; status: TaskStatus; assignedTechnicianId: string | null;
+  /** Numeric priority rank 1-7. Lower = more urgent. Defaults to 7 while backend calculates. */
+  priority: number; status: TaskStatus; assignedTechnicianId: string | null;
   assignedTechnicianName: string | null; createdAt: Date; takenAt: Date | null;
   completedAt: Date | null; customerWaiting: boolean; notes?: string;
   building: string; floor: string;
@@ -75,17 +78,23 @@ const mapTechnician = (doc: any): Technician => ({
   successRate: doc.successRate || 0,
   currentTasks: Array.isArray(doc.currentTasks) ? doc.currentTasks : [],
   phone: doc.phone || "",
+  fcmToken: Array.isArray(doc.fcmToken) ? doc.fcmToken : [],
 });
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
 const mapTask = (doc: any): PrinterTask => {
-  const issues: string[]   = Array.isArray(doc.issues) ? doc.issues : [];
-  const firstIssue         = (issues[0] ?? "Paper Jam") as IssueType;
-  const priority: Priority =
-    doc.priority === "HIGH" ? "High" : doc.priority === "MEDIUM" ? "Medium" : "Low";
+  const issues: string[] = Array.isArray(doc.issues) ? doc.issues : [];
+  const firstIssue       = (issues[0] ?? "Paper Jam") as IssueType;
+
+  // Backend sends numeric rank 1-7. Default to 7 (lowest) while computing.
+  const rawPriority = Number(doc.priority);
+  const priority: number = (!isNaN(rawPriority) && rawPriority >= 1 && rawPriority <= 7)
+    ? rawPriority
+    : 7;
+
   const status: TaskStatus =
-    doc.status === "DONE"           ? "Completed"  :
-    doc.employeeId?.length > 0      ? "Assigned"   : "Unassigned";
+    doc.status === "DONE"        ? "Completed"  :
+    doc.employeeId?.length > 0  ? "Assigned"   : "Unassigned";
 
   return {
     id: doc.$id,
@@ -98,10 +107,11 @@ const mapTask = (doc: any): PrinterTask => {
     status,
     assignedTechnicianId:   doc.employeeId || null,
     assignedTechnicianName: doc.employeeId ? "Technician" : null,
-    createdAt:   doc.createdAt   ? new Date(doc.createdAt)  : new Date(doc.$createdAt),
-    takenAt:     doc.takenAt     ? new Date(doc.takenAt)    : null,
+    createdAt:   doc.createdAt ? new Date(doc.createdAt)  : new Date(doc.$createdAt),
+    takenAt:     doc.takenAt   ? new Date(doc.takenAt)    : null,
     completedAt: doc.status === "DONE" ? new Date(doc.$updatedAt) : null,
-    customerWaiting: doc.priority === "HIGH",
+    // customerWaiting = true for critical tasks (ranks 1 & 2)
+    customerWaiting: priority <= 2,
     notes: doc.notes || "",
   };
 };
@@ -143,7 +153,13 @@ const mapPrinter = (doc: any): PrinterHealth => {
 // ─── Context ──────────────────────────────────────────────────────────────────
 const AppContext = createContext<AppContextType | null>(null);
 
-const PRIORITY_WEIGHT: Record<string, number> = { High: 3, Medium: 2, Low: 1 };
+// Sort ascending by numeric priority rank (1 = most urgent, 7 = least urgent)
+const sortTasks = (tasks: PrinterTask[]): PrinterTask[] =>
+  [...tasks].sort((a, b) =>
+    a.priority !== b.priority
+      ? a.priority - b.priority          // lower rank = higher urgency
+      : a.createdAt.getTime() - b.createdAt.getTime()
+  );
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -153,7 +169,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [printers,    setPrinters]    = useState<PrinterHealth[]>([]);
   const [isLoading,   setIsLoading]   = useState(true);
   const [sessionSecret, setSessionSecret] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const subscriptionRef = useRef<(() => void) | null>(null);
 
   // ── Fetch live data ────────────────────────────────────────────────────────
   const refreshData = async () => {
@@ -161,16 +177,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Use the sessionSecret from state if available
       const currentSession = await AsyncStorage.getItem("sessionSecret") || sessionSecret || undefined;
 
-      // 1. Tasks
-      const taskDocs = await listDocuments("tasks_collection", currentSession);
-      console.log("[AppContext] tasks fetched:", taskDocs.length);
-      const rawTasks = taskDocs.map(mapTask);
-      rawTasks.sort((a, b) =>
-        PRIORITY_WEIGHT[b.priority] !== PRIORITY_WEIGHT[a.priority]
-          ? PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority]
-          : a.createdAt.getTime() - b.createdAt.getTime()
-      );
-      setTasks(rawTasks);
+      // 1. Tasks (Try Backend Function, Fallback to direct DB list)
+      try {
+        const taskRes = await executeFunction("/tasks", "GET", undefined, currentSession);
+        const rawTasks = (taskRes.tasks || []).map(mapTask);
+        setTasks(rawTasks);
+      } catch (funcErr) {
+        console.warn("[AppContext] Backend function failed, falling back to direct DB fetch:", funcErr);
+        const taskDocs = await listDocuments("tasks_collection", currentSession);
+        setTasks(sortTasks(taskDocs.map(mapTask)));
+      }
 
       // 2. Printers
       const pDocs = await listDocuments("printers", currentSession);
@@ -188,10 +204,68 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // ── Poll every 15 s as a lightweight realtime substitute ─────────────────
-  const startPolling = () => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(refreshData, 15_000);
+  // ── Realtime Subscriptions ────────────────────────────────────────────────
+  const setupSubscriptions = () => {
+    if (subscriptionRef.current) {
+      subscriptionRef.current();
+    }
+
+    const channelPrefix = `databases.${APPWRITE.databaseId}.collections`;
+    
+    const unsubscribe = client.subscribe(
+      [
+        `${channelPrefix}.tasks_collection.documents`,
+        `${channelPrefix}.printers.documents`,
+        `${channelPrefix}.users_collection.documents`
+      ],
+      (response) => {
+        const { events, payload } = response;
+        
+        // Handle Tasks
+        if (events.some(e => e.includes("tasks_collection"))) {
+          const task = mapTask(payload);
+          setTasks(prev => {
+            const index = prev.findIndex(t => t.id === task.id);
+            if (index > -1) {
+              const updated = [...prev];
+              updated[index] = task;
+              return updated;
+            }
+            return sortTasks([task, ...prev]);
+          });
+        }
+
+        // Handle Printers
+        if (events.some(e => e.includes("printers"))) {
+          const printer = mapPrinter(payload);
+          setPrinters(prev => {
+            const index = prev.findIndex(p => p.id === printer.id);
+            if (index > -1) {
+              const updated = [...prev];
+              updated[index] = printer;
+              return updated;
+            }
+            return [printer, ...prev];
+          });
+        }
+
+        // Handle Technicians (Users)
+        if (events.some(e => e.includes("users_collection"))) {
+          const tech = mapTechnician(payload);
+          setTechnicians(prev => {
+            const index = prev.findIndex(t => t.id === tech.id);
+            if (index > -1) {
+              const updated = [...prev];
+              updated[index] = tech;
+              return updated;
+            }
+            return [tech, ...prev];
+          });
+        }
+      }
+    );
+
+    subscriptionRef.current = unsubscribe;
   };
 
   // ── Bootstrap ─────────────────────────────────────────────────────────────
@@ -229,11 +303,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         console.error("[AppContext] init error:", err);
       } finally {
         await refreshData();
-        startPolling();
+        setupSubscriptions();
       }
     };
     init();
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => { if (subscriptionRef.current) subscriptionRef.current(); };
   }, []);
 
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -263,6 +337,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         await AsyncStorage.setItem("currentUser", JSON.stringify(user));
         await AsyncStorage.setItem("sessionSecret", secret);
         
+        // 3. Register for push notifications & store in Appwrite
+        try {
+          const { registerForPushNotificationsAsync } = await import("@/services/notifications");
+          const pushToken = await registerForPushNotificationsAsync();
+          
+          if (pushToken) {
+            // Requirement 7: Support multiple devices using an array
+            // Fetch the specific user document to update tokens
+            if (pushToken && account?.$id) {
+              await executeFunction("/saveToken", "POST", { 
+                userId: account.$id, 
+                fcmToken: pushToken 
+              }, secret);
+              console.log("[AppContext] FCM token registered via Backend.");
+            }
+          }
+        } catch (pushErr) {
+          console.error("[AppContext] Notification registration failed (non-critical):", pushErr);
+        }
+
         // Refresh with auth header
         await refreshData();
         return true;
@@ -306,6 +400,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem("currentUser", JSON.stringify(guestUser));
     await AsyncStorage.setItem("sessionSecret", mockSecret);
     
+    // 3. Register for push notifications & store in Appwrite
+    try {
+      const { registerForPushNotificationsAsync } = await import("@/services/notifications");
+      const pushToken = await registerForPushNotificationsAsync();
+      
+      if (pushToken) {
+        // Since we are bypassing, we use the guest ID directly
+        // Ensure your users_collection allows "Any" role to update or has a guest_123 document.
+        const uDocs = await listDocuments("users_collection", mockSecret);
+        const myDoc = uDocs.find(d => d.$id === guestUser.id);
+        
+        if (myDoc) {
+          const currentTokens = Array.isArray(myDoc.fcmToken) ? myDoc.fcmToken : [];
+          if (!currentTokens.includes(pushToken)) {
+            const updatedTokens = [...currentTokens, pushToken];
+            await updateDocument("users_collection", guestUser.id, { fcmToken: updatedTokens }, mockSecret);
+            console.log("[AppContext] FCM token registered for Guest (Success).");
+          } else {
+            console.log("[AppContext] Guest device already registered.");
+          }
+        } else {
+          // Attempt to create/update even if doc not found
+          await updateDocument("users_collection", guestUser.id, { fcmToken: [pushToken] }, mockSecret);
+          console.log("[AppContext] FCM token saved to new Guest document.");
+        }
+      }
+    } catch (pushErr) {
+      console.error("[AppContext] Guest notification registration failed:", pushErr);
+    }
+
     // Attempt to refresh data, although it may fail if backend rules are strict
     refreshData();
   };
@@ -342,10 +466,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const currentSession = await AsyncStorage.getItem("sessionSecret") || sessionSecret || undefined;
       
-      // 1. Update task in Appwrite
-      await updateDocument("tasks_collection", taskId, { status: "DONE", notes: notes ?? "" }, currentSession);
+      // 1. Complete via Backend (calculates ART, updates technician stats, history logging)
+      await executeFunction(`/complete/${taskId}`, "PUT", { 
+        employeeId: currentUser?.id,   // standardized key
+        notes: notes ?? "" 
+      }, currentSession);
 
-      // 2. Synchronize Printer Health if task is completed
+      // Local state is updated via socket listener once backend confirms status: "DONE"
+      // or we can keep the local optimistic update for snappiness.
+
+      // 2. Synchronize Printer Health (locally for immediate feedback)
       if (task?.printerId) {
         const printer = printers.find(p => p.printerId === task.printerId);
         if (printer) {
@@ -355,12 +485,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             ...(isPaperIssue ? { paperLevel: 100, status: "Online" } : {})
           };
 
-          // Optimistic update of printer state
           setPrinters(prev => prev.map(p => 
             p.printerId === task.printerId ? { ...p, ...printerUpdate } : p
           ));
 
-          // Persist printer health change to Appwrite
+          // Also update printer on backend (could be moved to function later)
           await updateDocument("printers", printer.id, printerUpdate, currentSession);
         }
       }
@@ -387,24 +516,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       errorHistory: [],
     };
     setPrinters(prev => [newPrinter, ...prev]);
+    
     if (paperLevel <= 15) {
       const isZero = paperLevel === 0;
-      setTasks(prev => [{
-        id:                     "t_" + Date.now(),
-        printerId:              newPrinter.printerId,
-        location:               newPrinter.location,
-        issueType:              isZero ? "No Paper" : "Low Paper",
-        priority:               isZero ? "High" : "Medium",
-        status:                 "Unassigned",
-        assignedTechnicianId:   null,
-        assignedTechnicianName: null,
-        createdAt:              new Date(),
-        takenAt:                null,
-        completedAt:            null,
-        customerWaiting:        isZero,
-        building:               newPrinter.building,
-        floor:                  newPrinter.floor,
-      }, ...prev]);
+      const currentSession = sessionSecret || undefined;
+      
+      // Create task via Backend. Send priority: 7 (default/initializing).
+      // Backend will calculate the true numeric rank (1-6) based on issue type.
+      executeFunction("/tasks", "POST", {
+        printerId: newPrinter.printerId,
+        location: newPrinter.location,
+        issueType: [isZero ? "No Paper" : "Low Paper"],
+        building: newPrinter.building,
+        floor: newPrinter.floor,
+        priority: 7
+      }, currentSession as string).then(() => refreshData());
     }
   };
 

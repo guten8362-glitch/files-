@@ -5,6 +5,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { PrinterTask } from "@/context/AppContext";
+import { getPriorityColors } from "@/lib/priorityUtils";
 import { PriorityBadge } from "./PriorityBadge";
 import { StatusBadge } from "./StatusBadge";
 import { LiveTimer } from "./LiveTimer";
@@ -88,11 +89,11 @@ export function TaskCard({ task, onPress, currentUserId, isSenior, isPrinterAssi
 
       <View style={styles.header}>
         <View style={styles.printerInfo}>
-          <View style={[styles.iconBox, { backgroundColor: task.priority === "High" ? Colors.priorityHighBg : task.priority === "Medium" ? Colors.priorityMediumBg : Colors.priorityLowBg }]}>
+          <View style={[styles.iconBox, { backgroundColor: getPriorityColors(task.priority).bg }]}>
             <Feather
               name={ISSUE_ICONS[task.issueType] as any || "printer"}
               size={16}
-              color={task.priority === "High" ? Colors.priorityHigh : task.priority === "Medium" ? Colors.priorityMedium : Colors.priorityLow}
+              color={getPriorityColors(task.priority).text}
             />
           </View>
           <View>

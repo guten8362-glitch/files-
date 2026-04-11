@@ -1,9 +1,19 @@
+import { Client, Databases } from "appwrite";
+
 // Appwrite REST API client — no SDK needed, uses native fetch()
 export const APPWRITE = {
   endpoint:     'https://nyc.cloud.appwrite.io/v1',
   projectId:    '69cbdcee0026c57793ab',
   databaseId:   '69cbdded00392d03962c',
 };
+
+const client = new Client();
+client
+  .setEndpoint(APPWRITE.endpoint)
+  .setProject(APPWRITE.projectId);
+
+export const databases = new Databases(client);
+export { client };
 
 const headers = () => ({
   'Content-Type':       'application/json',
@@ -53,12 +63,15 @@ export async function deleteSession(sessionSecret: string): Promise<void> {
 /** List all documents in a collection (max 100 per call) */
 export async function listDocuments(collectionId: string, sessionSecret?: string): Promise<any[]> {
   const url = `${APPWRITE.endpoint}/databases/${APPWRITE.databaseId}/collections/${collectionId}/documents?limit=100`;
+  console.log(`[Appwrite] Fetching from: ${collectionId} (Full URL: ${url})`);
+  
   const h = headers() as any;
   if (sessionSecret) h["X-Appwrite-Session"] = sessionSecret;
   
   const res  = await fetch(url, { headers: h });
   if (!res.ok) {
     const err = await res.text();
+    console.error(`[Appwrite Error] Status: ${res.status} | Collection: ${collectionId} | Response:`, err);
     throw new Error(`Appwrite [${collectionId}]: ${res.status} ${err}`);
   }
   const json = await res.json();
@@ -79,5 +92,39 @@ export async function updateDocument(collectionId: string, documentId: string, d
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Appwrite update [${collectionId}/${documentId}]: ${res.status} ${err}`);
+  }
+}
+
+/** Execute a Cloud Function */
+export async function executeFunction(path: string, method: string = 'POST', data?: object, sessionSecret?: string): Promise<any> {
+  const url = `${APPWRITE.endpoint}/functions/backend_function_id/executions`; // Replace with actual function ID
+  const h = headers() as any;
+  if (sessionSecret) h["X-Appwrite-Session"] = sessionSecret;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: h,
+    body: JSON.stringify({
+      async: false,
+      xpath: path, // We use xpath to pass the internal route
+      method: method,
+      body: data ? JSON.stringify(data) : undefined
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Appwrite function execution failed: ${res.status} ${err}`);
+  }
+
+  const json = await res.json();
+  if (json.status === 'failed') {
+    throw new Error(`Function execution status failed: ${json.errors || 'Unknown error'}`);
+  }
+
+  try {
+    return JSON.parse(json.responseBody);
+  } catch (e) {
+    return json.responseBody;
   }
 }

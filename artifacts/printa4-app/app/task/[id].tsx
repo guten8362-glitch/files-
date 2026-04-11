@@ -76,16 +76,21 @@ export default function TaskDetailScreen() {
     }
 
     if (task.status === "Unassigned") {
-      // Do nothing, take task is removed
+      // takeTask(task.id); // Uncomment if takeTask is still needed, but user said it's removed
       return;
-    } else if (task.status === "Fixing" || (nextStatus === "Completed")) {
+    } 
+    
+    // If we are in the last stage before completion or currently fixing
+    if (task.status === "Fixing" || nextStatus === "Completed") {
       Alert.alert(
         "Complete Task",
         "Are you sure you want to mark this task as completed?",
         [
           { text: "Cancel", style: "cancel" },
           {
-            text: "Complete", onPress: () => {
+            text: "Complete", 
+            onPress: () => {
+              // Simplified: Backend handles history/stats
               completeTask(task.id, notes);
               router.back();
             },

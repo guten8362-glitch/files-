@@ -1,26 +1,30 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import Colors from "@/constants/colors";
-import { Priority } from "@/context/AppContext";
+import { getPriorityColors, getPriorityLabel } from "@/lib/priorityUtils";
 
 interface Props {
-  priority: Priority;
+  /** Numeric priority rank 1-7. Lower = more urgent. */
+  priority: number;
   size?: "sm" | "md";
 }
 
 export function PriorityBadge({ priority, size = "md" }: Props) {
-  const config = {
-    High: { bg: Colors.priorityHighBg, text: Colors.priorityHigh, dot: Colors.priorityHigh },
-    Medium: { bg: Colors.priorityMediumBg, text: Colors.priorityMedium, dot: Colors.priorityMedium },
-    Low: { bg: Colors.priorityLowBg, text: Colors.priorityLow, dot: Colors.priorityLow },
-  }[priority];
-
+  const colors = getPriorityColors(priority);
+  const label = getPriorityLabel(priority);
   const isSmall = size === "sm";
 
   return (
-    <View style={[styles.badge, { backgroundColor: config.bg }, isSmall && styles.badgeSm]}>
-      <View style={[styles.dot, { backgroundColor: config.dot }, isSmall && styles.dotSm]} />
-      <Text style={[styles.text, { color: config.text }, isSmall && styles.textSm]}>{priority}</Text>
+    <View
+      style={[
+        styles.badge,
+        { backgroundColor: colors.bg, borderColor: colors.border },
+        isSmall && styles.badgeSm,
+      ]}
+    >
+      <View style={[styles.dot, { backgroundColor: colors.dot }, isSmall && styles.dotSm]} />
+      <Text style={[styles.text, { color: colors.text }, isSmall && styles.textSm]}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -32,6 +36,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
+    borderWidth: 1,
     gap: 5,
   },
   badgeSm: {
