@@ -1,29 +1,16 @@
 {
-<<<<<<< HEAD
-  "name": "starter-template",
-  "version": "1.0.0",
-  "description": "",
+  "name": "supporta4-backend",
+  "version": "1.2.0",
+  "description": "SupportA4 Printer Maintenance Backend API",
   "main": "src/main.js",
   "type": "module",
-  "scripts": {
-    "format": "prettier --write ."
-  },
   "dependencies": {
     "node-appwrite": "^14.1.0"
   },
   "devDependencies": {
     "prettier": "^3.2.5"
-=======
-  "name": "appwrite-printer-backend",
-  "version": "1.0.0",
-  "description": "Appwrite Printer Maintenance Backend API in Node.js",
-  "main": "src/main.js",
-  "type": "module",
-  "dependencies": {
-    "node-appwrite": "^14.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
->>>>>>> 517ed24f268f53669729810b2254975543ac584b
   }
 }
