@@ -12,7 +12,7 @@ export default async ({ req, res, log, error }) => {
   const client = new Client()
     .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT || 'https://nyc.cloud.appwrite.io/v1')
     .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
-    .setKey(process.env.APPWRITE_API_KEY || req.headers['x-appwrite-key'] ?? '');
+    .setKey(process.env.APPWRITE_API_KEY || (req.headers['x-appwrite-key'] ?? ''));
 
   const databases = new Databases(client);
   const users = new Users(client);
@@ -73,6 +73,17 @@ export default async ({ req, res, log, error }) => {
       return res.json({ tasks: tasks.documents });
     }
 
+    if (path === '/users' && method === 'GET') {
+      const docs = await databases.listDocuments(DATABASE_ID, COLLECTION_USERS);
+      return res.json({ users: docs.documents });
+    }
+
+
+    if (path === '/printers' && method === 'GET') {
+      const docs = await databases.listDocuments(DATABASE_ID, COLLECTION_PRINTERS);
+      return res.json({ printers: docs.documents });
+    }
+
     if (path === '/saveToken' && method === 'POST') {
       const { userId, fcmToken } = req.body;
       if (!userId || !fcmToken) return res.json({ error: 'Missing params' }, 400);
@@ -99,7 +110,7 @@ export default async ({ req, res, log, error }) => {
 
     return res.json({
       name: "SupportA4 Backend",
-      version: "1.2.0",
+      version: "1.2.1",
       status: "online"
     });
 
