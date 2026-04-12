@@ -5,9 +5,10 @@ import { Client, Databases, Users, Messaging, ID, Query } from 'node-appwrite';
  */
 export default async ({ req, res, log, error }) => {
     const client = new Client()
-        .setEndpoint(process.env.APPWRITE_FUNCTION_ENDPOINT || 'https://cloud.appwrite.io/v1')
+        .setEndpoint(process.env.APPWRITE_ENDPOINT || process.env.APPWRITE_FUNCTION_ENDPOINT || 'https://nyc.cloud.appwrite.io/v1')
         .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
         .setKey(process.env.APPWRITE_API_KEY);
+
 
     const databases = new Databases(client);
     const messaging = new Messaging(client);
