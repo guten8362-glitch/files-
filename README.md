@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ⚡ Node.js Starter Function
 
 A simple starter function. Edit `src/main.js` to get started and create something awesome! 🚀
@@ -46,3 +47,6 @@ Sample `200` Response:
 ## 🔒 Environment Variables
 
 No environment variables required.
+=======
+# files-
+>>>>>>> 517ed24f268f53669729810b2254975543ac584b
