@@ -84,6 +84,17 @@ export default async ({ req, res, log, error }) => {
       return res.json({ printers: docs.documents });
     }
 
+    if (path === '/shops' && method === 'GET') {
+      const docs = await databases.listDocuments(DATABASE_ID, COLLECTION_SHOPS);
+      return res.json({ shops: docs.documents });
+    }
+
+    if (path === '/history' && method === 'GET') {
+      const docs = await databases.listDocuments(DATABASE_ID, 'history_collection'); // Hardcoded history ID for now
+      return res.json({ history: docs.documents });
+    }
+
+
     if (path === '/saveToken' && method === 'POST') {
       const { userId, fcmToken } = req.body;
       if (!userId || !fcmToken) return res.json({ error: 'Missing params' }, 400);
