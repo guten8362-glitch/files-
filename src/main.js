@@ -47,8 +47,17 @@ export default async ({ req, res, log, error }) => {
             return res.json({ success: true, users: result.documents });
         }
 
-        // --- 3. TASKS LIST ---
+        // --- 3. GET PRINTERS ---
+        if (path === '/printers' && method === 'GET') {
+            const result = await databases.listDocuments(DATABASE_ID, PRINTERS_COL, [
+                Query.limit(100)
+            ]);
+            return res.json({ success: true, printers: result.documents });
+        }
+
+        // --- 4. TASKS LIST ---
         if (path === '/tasks' && method === 'GET') {
+
             const result = await databases.listDocuments(DATABASE_ID, TASKS_COL, [
                 Query.limit(100),
                 Query.orderDesc('$createdAt')
