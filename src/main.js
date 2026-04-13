@@ -85,14 +85,14 @@ async function dispatchPushNotification(databases, messaging, users, DATABASE_ID
 
     const title = `${urgency}: ${issueType}`;
     const bodyText = `Printer ${printerId} at ${location} needs immediate attention!`;
-    
+
     // Convert all values to strings for FCM data compatibility
-    const data = { 
-      issueType: String(issueType), 
-      printerId: String(printerId), 
-      location: String(location), 
-      priority: String(priority), 
-      screen: 'tasks' 
+    const data = {
+        issueType: String(issueType),
+        printerId: String(printerId),
+        location: String(location),
+        priority: String(priority),
+        screen: 'tasks'
     };
 
     log(`[NOTIFY] Dispatching: "${title}"`);
@@ -111,12 +111,12 @@ export default async ({ req, res, log, error }) => {
     const messaging = new Messaging(client);
     const usersApi = new Users(client);
 
-    const DATABASE_ID     = '69cbdded00392d03962c';
-    const TASKS_COL       = 'maintenance';
-    const USERS_COL       = 'users_collection';
+    const DATABASE_ID = '69cbdded00392d03962c';
+    const TASKS_COL = 'maintenance';
+    const USERS_COL = 'users_collection';
     const FCM_PROVIDER_ID = '69d4d2ce0027660c1fe2'; // Provider ID from Messaging tab
 
-    const path   = req.path   || '/';
+    const path = req.path || '/';
     const method = req.method || 'GET';
 
     let payload = {};
@@ -165,7 +165,7 @@ export default async ({ req, res, log, error }) => {
             if (!userId || !fcmToken) return res.json({ error: 'Missing data' }, 400);
 
             log(`[Token] Registering for user ${userId}`);
-            
+
             // 1. Appwrite Push Target (Mandatory for Messaging)
             try {
                 await usersApi.createTarget(userId, ID.unique(), 'push', fcmToken, FCM_PROVIDER_ID);
