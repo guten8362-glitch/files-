@@ -336,30 +336,35 @@ export default async ({ req, res, log, error }) => {
 
   log(`--> ${method} ${path}`);
 
-  // ── "/" — Appwrite DB Event trigger for new tasks ──────────────────────────
+  // ── "/" — Appwrite DB Event trigger ───────────────────────────────────────
   // Setup: Appwrite Console → Functions → Events:
   //   databases.69cbdded00392d03962c.collections.maintenance.documents.*.create
+  //   databases.69cbdded00392d03962c.collections.maintenance.documents.*.update
   if (path === '/') {
     const eventHeader = req.headers?.['x-appwrite-event'] || '';
     log(`[Event] x-appwrite-event: ${eventHeader || '(none)'}`);
 
-    if (eventHeader.includes('maintenance') && eventHeader.includes('create')) {
+    const isMaintenanceEvent = eventHeader.includes('maintenance');
+    const isDataChange = eventHeader.includes('create') || eventHeader.includes('update');
+
+    if (isMaintenanceEvent && isDataChange) {
       const doc       = payload;
       const errorType = doc.error_type || '';
-      log(`[Event] New task: error_type="${errorType}" printer="${doc.printer_id}"`);
+      log(`[Event] Doc Action: ${eventHeader.split('.').pop()} | error_type="${errorType}"`);
 
+      // We only notify if it's currently high priority
       if (isHighPriority(errorType)) {
-        log('[Event] HIGH PRIORITY → sending notifications now...');
+        log('[Event] HIGH PRIORITY → dispatching notifications...');
         await dispatchPushNotification(
           databases, messaging, usersApi,
           DATABASE_ID, USERS_COL, FCM_PROVIDER_ID,
           errorType, doc, log, error
         );
       } else {
-        log(`[Event] Priority too low for notification: "${errorType}"`);
+        log(`[Event] Priority check: "${errorType}" is not high priority.`);
       }
     }
-    return res.json({ success: true, event: 'received' });
+    return res.json({ success: true, event: 'processed' });
   }
 
   try {
