@@ -5,26 +5,29 @@ import { Client, Databases, Users, Messaging, ID, Query } from 'node-appwrite';
  * uses Appwrite's built-in Messaging service.
  */
 
-// ─── Priority map ─────────────────────────────────────────────────────────────
-const PRIORITY_MAP = {
-    'No paper': 1, 'No Paper': 1,
-    'Service Requested': 2,
-    'Jammed': 3, 'Paper Jam': 3,
-    'Door Opened': 4,
-    'No toner ink': 5, 'No Toner': 5,
-    'Printer Offline': 6, 'Offline': 6,
-    'Low paper': 7, 'Low Paper': 7,
-};
+// ─── Priority & Labels ────────────────────────────────────────────────────────
+const PRIORITY_RULES = [
+    { type: 'No paper', priority: 1, label: '🚨 CRITICAL', color: 'High' },
+    { type: 'Service Requested', priority: 2, label: '⚠️ HIGH', color: 'High' },
+    { type: 'Jammed', priority: 3, label: '🟠 JAMMED', color: 'Orange' },
+    { type: 'Paper Jam', priority: 3, label: '🟠 JAMMED', color: 'Orange' },
+    { type: 'Door Opened', priority: 4, label: '⚡ IMMEDIATE', color: 'Orange' },
+    { type: 'No toner ink', priority: 5, label: '🔵 CRITICAL', color: 'Blue' },
+    { type: 'No Toner', priority: 5, label: '🔵 CRITICAL', color: 'Blue' },
+    { type: 'Printer Offline', priority: 5, label: '🔵 CRITICAL', color: 'Blue' },
+    { type: 'Offline', priority: 5, label: '🔵 CRITICAL', color: 'Blue' },
+    { type: 'Low paper', priority: 6, label: '✅ READY', color: 'Yellow' }
+];
 
-const HIGH_PRIORITY_TYPES = ['No paper', 'No Paper', 'Service Requested', 'Jammed', 'Paper Jam'];
-
-function calcPriority(errorType) {
-    return PRIORITY_MAP[String(errorType || '')] || 7;
+function getRule(issueType) {
+    const s = String(issueType || '').toLowerCase();
+    return PRIORITY_RULES.find(r => s.includes(r.type.toLowerCase())) || { priority: 7, label: '⚡ TASK', color: 'Grey' };
 }
 
 function isHighPriority(issueType) {
-    const s = String(issueType || '').toLowerCase();
-    return HIGH_PRIORITY_TYPES.some(h => s.includes(h.toLowerCase()));
+    // Notify for almost everything requested except Low Paper maybe? 
+    // Usually everything priority 1-5 warrants a push.
+    return getRule(issueType).priority <= 5;
 }
 
 // ─── Appwrite Messaging Push ──────────────────────────────────────────────────
@@ -49,7 +52,7 @@ async function sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title
             return false;
         }
 
-        log(`[Messaging] Dispatching to ${targetIds.length} target(s): "${title}"`);
+        log(`[Messaging] Sending to ${targetIds.length} target(s)...`);
 
         await messaging.createPush(
             ID.unique(),      // messageId
@@ -60,11 +63,11 @@ async function sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title
             targetIds,        // targets
             data,             // data payload
             'tasks',          // action
-            undefined,        // image (FIXED: was empty string)
-            undefined,        // icon (FIXED: was empty string)
-            'default',        // sound
+            undefined,        // image
+            undefined,        // icon
+            'notification',   // sound (FIXED: Looking for notification.wav)
             undefined,        // color
-            'high_priority',  // tag
+            'maintenance',    // tag
             1,                // badge
             false             // draft
         );
@@ -78,20 +81,19 @@ async function sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title
 
 // ─── Master notification dispatcher ──────────────────────────────────────────
 async function dispatchPushNotification(databases, messaging, users, DATABASE_ID, USERS_COL, FCM_PROVIDER_ID, issueType, doc, log, error) {
-    const location = doc.location || doc.building || 'Unknown Location';
-    const printerId = doc.printer_id || 'Unknown Printer';
-    const priority = calcPriority(issueType);
-    const urgency = priority === 1 ? '🚨 CRITICAL' : priority === 2 ? '⚠️ URGENT' : '⚡ HIGH';
+    const location = (doc.location || doc.building || 'UNKNOWN LOCATION').toUpperCase();
+    const printerId = (doc.printer_id || 'UNKNOWN PRINTER').toUpperCase();
+    const rule = getRule(issueType);
 
-    const title = `${urgency}: ${issueType}`;
-    const bodyText = `Printer ${printerId} at ${location} needs immediate attention!`;
+    const title = `${rule.label}: ${String(issueType).toUpperCase()}`;
+    const bodyText = `📍 ${location}\n🖨️ PRINTER: ${printerId}\nNeeds intervention now.`;
 
     // Convert all values to strings for FCM data compatibility
     const data = {
         issueType: String(issueType),
         printerId: String(printerId),
         location: String(location),
-        priority: String(priority),
+        priority: String(rule.priority),
         screen: 'tasks'
     };
 
