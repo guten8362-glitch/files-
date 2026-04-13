@@ -88,16 +88,17 @@ async function dispatchPushNotification(databases, messaging, users, DATABASE_ID
     const title = `${rule.label}: ${String(issueType).toUpperCase()}`;
     const bodyText = `📍 ${location}\n🖨️ PRINTER: ${printerId}\nNeeds intervention now.`;
 
-    // Convert all values to strings for FCM data compatibility
-    const data = {
-        issueType: String(issueType),
-        printerId: String(printerId),
-        location: String(location),
-        priority: String(rule.priority),
-        screen: 'tasks'
+    const data = { 
+      issueType: String(issueType), 
+      printerId: String(printerId), 
+      location: String(location), 
+      priority: String(rule.priority), 
+      screen: 'tasks',
+      channelId: 'high_priority_tasks', // MATCHES THE PHONE CHANNEL
+      android_channel_id: 'high_priority_tasks' // FCM SPECIFIC HINT
     };
 
-    log(`[NOTIFY] Dispatching: "${title}"`);
+    log(`[NOTIFY] Dispatching to channel: high_priority_tasks`);
     await sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title, bodyText, data, log, error);
 }
 
