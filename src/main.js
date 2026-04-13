@@ -35,6 +35,28 @@ export default async ({ req, res, log, error }) => {
 
     log(`API CALL: ${method} ${path}`);
 
+    // --- 0. ROOT / EVENT TRIGGER HANDLER ---
+    // Appwrite fires the function with path '/' for database event triggers.
+    // Handle FCM notification dispatch here for new high-priority tasks.
+    if (path === '/') {
+        // This is a database event trigger — check if it's a new task creation
+        const eventType = req.headers['x-appwrite-event'] || '';
+        if (eventType.includes('databases') && eventType.includes('maintenance') && eventType.includes('create')) {
+            try {
+                const doc = req.body ? (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) : {};
+                const errorType = doc.error_type || '';
+                const HIGH_PRIORITY = ['No paper', 'No Paper', 'Service Requested', 'Jammed', 'Paper Jam'];
+                if (HIGH_PRIORITY.some(h => errorType.toLowerCase().includes(h.toLowerCase()))) {
+                    log(`[FCM] High-priority task detected: ${errorType} — fetching tokens`);
+                    await sendHighPriorityAlert(databases, messaging, users, DATABASE_ID, USERS_COL, FCM_PROVIDER_ID, errorType, doc, log, error);
+                }
+            } catch (e) {
+                error('[FCM] Event trigger handler failed: ' + e.message);
+            }
+        }
+        return res.json({ success: true, message: 'Event received' });
+    }
+
     try {
         // --- 1. HEALTH CHECK ---
         if (path === '/ping') {
@@ -77,7 +99,15 @@ export default async ({ req, res, log, error }) => {
                 startTime: new Date().toISOString()
             });
 
-            // Auto-notify if high priority (Simple placeholder for now)
+            // Notify ALL technicians if this is a high-priority task
+            const HIGH_PRIORITY_TYPES = ['No paper', 'No Paper', 'Service Requested', 'Jammed', 'Paper Jam'];
+            const issueStr = Array.isArray(payload.issueType) ? payload.issueType[0] : payload.issueType || '';
+            if (HIGH_PRIORITY_TYPES.some(h => issueStr.toLowerCase().includes(h.toLowerCase()))) {
+                log(`[FCM] High-priority task created: ${issueStr} — dispatching notifications`);
+                // Don't await — fire and forget so it doesn't slow down the response
+                sendHighPriorityAlert(databases, messaging, users, DATABASE_ID, USERS_COL, FCM_PROVIDER_ID, issueStr, doc, log, error)
+                    .catch(e => error('[FCM] Background notification failed: ' + e.message));
+            }
             return res.json({ success: true, data: doc });
         }
 
@@ -113,3 +143,57 @@ export default async ({ req, res, log, error }) => {
         return res.json({ success: false, error: e.message }, 500);
     }
 };
+
+// ─── FCM Helper: send push to all technicians ────────────────────────────────
+async function sendHighPriorityAlert(databases, messaging, users, DATABASE_ID, USERS_COL, FCM_PROVIDER_ID, issueType, doc, log, error) {
+    try {
+        // 1. Collect all FCM targets from Appwrite Users (registered via /saveToken)
+        const allUsers = await users.list();
+        const targetIds = [];
+
+        for (const u of allUsers.users) {
+            try {
+                const targets = await users.listTargets(u.$id);
+                for (const t of targets.targets) {
+                    if (t.providerType === 'push') {
+                        targetIds.push(t.$id);
+                    }
+                }
+            } catch (_) { /* skip users without targets */ }
+        }
+
+        if (targetIds.length === 0) {
+            log('[FCM] No push targets registered — skipping notification');
+            return;
+        }
+
+        log(`[FCM] Sending to ${targetIds.length} target(s)`);
+
+        const location = doc.location || doc.building || 'Unknown Location';
+        const printerId = doc.printer_id || 'Unknown Printer';
+
+        await messaging.createPush(
+            ID.unique(),
+            `🚨 URGENT: ${issueType}`,                    // title
+            `Printer ${printerId} at ${location} needs immediate attention!`, // body
+            [], // topics
+            targetIds, // specific targets
+            [], // users
+            undefined, // scheduledAt
+            { issueType, printerId, location },           // data
+            undefined, // action
+            undefined, // image
+            undefined, // icon
+            'default',                                     // sound channel
+            undefined, // color
+            false,     // tag
+            undefined, // badge
+            false,     // draft — send immediately
+            undefined  // scheduledAt
+        );
+
+        log(`[FCM] Push notification dispatched for ${issueType} at ${location}`);
+    } catch (e) {
+        error('[FCM] sendHighPriorityAlert failed: ' + e.message);
+    }
+}
