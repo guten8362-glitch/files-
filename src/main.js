@@ -59,19 +59,19 @@ async function sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title
             [],               // users
             targetIds,        // targets
             data,             // data payload
-            'tasks',          // action (screen name)
-            '',               // image
-            '',               // icon
+            'tasks',          // action
+            undefined,        // image (FIXED: was empty string)
+            undefined,        // icon (FIXED: was empty string)
             'default',        // sound
-            '',               // color
+            undefined,        // color
             'high_priority',  // tag
             1,                // badge
-            false             // draft (MUST BE FALSE TO SEND NOW)
+            false             // draft
         );
-        log('[Messaging] ✓ Push dispatched successfully');
+        log('[Messaging] ✓ Push sent successfully');
         return true;
     } catch (e) {
-        error('[Messaging] ✗ Failed: ' + e.message);
+        error('[Messaging] ✗ Error: ' + e.message);
         return false;
     }
 }
@@ -85,16 +85,20 @@ async function dispatchPushNotification(databases, messaging, users, DATABASE_ID
 
     const title = `${urgency}: ${issueType}`;
     const bodyText = `Printer ${printerId} at ${location} needs immediate attention!`;
+    
+    // Convert all values to strings for FCM data compatibility
     const data = { 
-      issueType, 
-      printerId, 
-      location, 
+      issueType: String(issueType), 
+      printerId: String(printerId), 
+      location: String(location), 
       priority: String(priority), 
       screen: 'tasks' 
     };
 
+    log(`[NOTIFY] Dispatching: "${title}"`);
     await sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title, bodyText, data, log, error);
 }
+
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
 export default async ({ req, res, log, error }) => {
