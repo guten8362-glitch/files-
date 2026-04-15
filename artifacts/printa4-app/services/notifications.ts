@@ -6,7 +6,6 @@ import Constants from 'expo-constants';
 // Configure how notifications are handled when the app is open
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
     shouldShowBanner: true,
@@ -23,12 +22,15 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
+      name: 'SupportA4 Alerts',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#FF231F7C',
+      // sound: 'notification.wav' — requires native rebuild via EAS Build;
+      // uses Android default sound until then.
     });
   }
+
 
   if (Device.isDevice) {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();

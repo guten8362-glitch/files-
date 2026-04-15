@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Print-Tech Flow",
-    "slug": "print-tech-flow",
+    "name": "SupportA4",
+    "slug": "supporta4",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -33,7 +33,14 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "expo-notifications"
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/notification.wav"
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false,
@@ -44,8 +51,9 @@
         "origin": "https://replit.com/"
       },
       "eas": {
-        "projectId": "c93a4a4a-bb95-44dc-bd38-f23e5d98db6b"
+        "projectId": "3dc40310-a4ad-4063-bf00-a010090b798a"
       }
-    }
+    },
+    "owner": "ak5319"
   }
 }

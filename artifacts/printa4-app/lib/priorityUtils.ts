@@ -22,11 +22,11 @@ export type PriorityColors = {
 export type PriorityBand = "critical" | "warning" | "info" | "low";
 
 export function getPriorityBand(rank: number): PriorityBand {
-  if (rank <= 2) return "critical";
-  if (rank <= 4) return "warning";
-  if (rank <= 6) return "info";
-  return "low";
+  if (rank <= 2) return "critical"; // Red: No Paper (1), Service Requested (2)
+  if (rank <= 5) return "warning";  // Yellow/Orange: Jammed (3), Door Opened (4), No Toner (5)
+  return "low"; // Green: Offline (6), Low Paper (7)
 }
+
 
 export function getPriorityLabel(rank: number): string {
   if (rank <= 2) return `P${rank} · Critical`;

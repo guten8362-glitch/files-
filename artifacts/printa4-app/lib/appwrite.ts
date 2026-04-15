@@ -97,7 +97,7 @@ export async function updateDocument(collectionId: string, documentId: string, d
 
 /** Execute a Cloud Function */
 export async function executeFunction(path: string, method: string = 'POST', data?: object, sessionSecret?: string): Promise<any> {
-  const url = `${APPWRITE.endpoint}/functions/backend_function_id/executions`; // Replace with actual function ID
+  const url = `${APPWRITE.endpoint}/functions/69d7268500220e52ca26/executions`;
   const h = headers() as any;
   if (sessionSecret) h["X-Appwrite-Session"] = sessionSecret;
 
@@ -106,7 +106,8 @@ export async function executeFunction(path: string, method: string = 'POST', dat
     headers: h,
     body: JSON.stringify({
       async: false,
-      xpath: path, // We use xpath to pass the internal route
+      path: path, // Correct field for Appwrite Function routing
+
       method: method,
       body: data ? JSON.stringify(data) : undefined
     }),

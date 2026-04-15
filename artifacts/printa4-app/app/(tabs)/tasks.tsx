@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Text,
   View,
-  TextInput,
 } from "react-native";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
@@ -19,7 +18,7 @@ import { TaskCard } from "@/components/TaskCard";
 
 
 export default function TasksScreen() {
-  const { tasks, takeTask, currentUser, logout, technicians, refreshData } = useApp();
+  const { tasks, takeTask, currentUser, logout, technicians, refreshData, isLoading } = useApp();
   const insets = useSafeAreaInsets();
   
   const [reassignTaskId, setReassignTaskId] = useState<string | null>(null);
@@ -33,7 +32,8 @@ export default function TasksScreen() {
     if (currentUser?.role !== "Senior Technician") {
       list = list.filter(t =>
         !t.assignedTechnicianId || 
-        t.assignedTechnicianId === currentUser?.id
+        t.assignedTechnicianId === currentUser?.id ||
+        t.assignedTechnicianId === currentUser?.email // email check as fallback
       );
     }
     return list;
@@ -50,19 +50,26 @@ export default function TasksScreen() {
   };
 
   const handleReassign = async (techId: string) => {
-    // We would trigger a context/appwrite update here
     setReassignTaskId(null);
     setIsReassignModalVisible(false);
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     refreshData();
   };
 
+  if (isLoading) {
+    return (
+      <View style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={styles.subtitle}>Refreshing tasks...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
       <View style={[styles.headerArea, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 16) }]}>
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.title}>Tasks</Text>
+            <Text style={styles.title}>SupportA4</Text>
             <Text style={styles.subtitle}>{filtered.length} active • {tasks.filter(t => !t.assignedTechnicianId).length} unassigned</Text>
           </View>
           <View style={styles.headerActions}>
@@ -70,8 +77,8 @@ export default function TasksScreen() {
               style={styles.assistBtn}
               onPress={() => router.push("/assistance")}
             >
-              <Feather name="phone-call" size={16} color={Colors.priorityHigh} />
-              <Text style={styles.assistBtnText}>Help</Text>
+              <Feather name="help-circle" size={16} color={Colors.primary} />
+              <Text style={[styles.assistBtnText, { color: Colors.primary }]}>Help</Text>
             </Pressable>
             <Pressable
               style={styles.logoutBtn}
@@ -82,8 +89,6 @@ export default function TasksScreen() {
           </View>
         </View>
       </View>
-
-
 
       <FlatList
         data={filtered}
@@ -96,12 +101,16 @@ export default function TasksScreen() {
           <TaskCard
             task={item}
             onPress={() => router.push({ pathname: "/task/[id]", params: { id: item.id } })}
+            onTakeTask={(id) => takeTask(id)}
             currentUserId={currentUser?.id}
+            currentUserEmail={currentUser?.email}
             isSenior={currentUser?.role === "Senior Technician"}
             isPrinterAssignedToMe={false}
             onReassign={() => openReassign(item.id)}
+            technicians={technicians}
           />
         )}
+
         ListEmptyComponent={
           <View style={styles.empty}>
             <Feather name="check-circle" size={40} color={Colors.priorityLow} />
@@ -111,6 +120,7 @@ export default function TasksScreen() {
         }
         showsVerticalScrollIndicator={false}
       />
+
 
 
 

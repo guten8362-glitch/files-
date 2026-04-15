@@ -8,6 +8,7 @@ interface Props {
   isUrgent?: boolean;
   showIcon?: boolean;
   compact?: boolean;
+  maxMinutes?: number;
 }
 
 function formatDuration(ms: number): string {
@@ -19,13 +20,10 @@ function formatDuration(ms: number): string {
   if (hours > 0) {
     return `${hours}h ${minutes}m`;
   }
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`;
-  }
-  return `${seconds}s`;
+  return `${minutes}m ${seconds}s`;
 }
 
-export function LiveTimer({ startTime, isUrgent = false, showIcon = true, compact = false }: Props) {
+export function LiveTimer({ startTime, isUrgent = false, showIcon = true, compact = false, maxMinutes }: Props) {
   const [elapsed, setElapsed] = useState(Date.now() - startTime.getTime());
 
   useEffect(() => {
@@ -35,8 +33,10 @@ export function LiveTimer({ startTime, isUrgent = false, showIcon = true, compac
     return () => clearInterval(interval);
   }, [startTime]);
 
+  const isOverTimeLimit = maxMinutes ? (elapsed > maxMinutes * 60 * 1000) : false;
   const isOverdue = elapsed > 30 * 60 * 1000;
-  const color = isOverdue || isUrgent ? Colors.priorityHigh : Colors.textSecondary;
+  const color = isOverdue || isUrgent || isOverTimeLimit ? Colors.priorityHigh : Colors.textSecondary;
+
 
   return (
     <View style={styles.container}>

@@ -1,10 +1,10 @@
-import React, { useRef } from "react";
-import { Platform, Pressable, StyleSheet, Text, View, Animated } from "react-native";
-import { Swipeable } from "react-native-gesture-handler";
+import React, { useRef, useState, useMemo } from "react";
+import { Platform, Pressable, StyleSheet, Text, View, Animated, ActivityIndicator } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 import Colors from "@/constants/colors";
-import { PrinterTask } from "@/context/AppContext";
+import { PrinterTask, Technician } from "@/context/AppContext";
 import { getPriorityColors } from "@/lib/priorityUtils";
 import { PriorityBadge } from "./PriorityBadge";
 import { StatusBadge } from "./StatusBadge";
@@ -13,166 +13,175 @@ import { LiveTimer } from "./LiveTimer";
 interface Props {
   task: PrinterTask;
   onPress: () => void;
+  onTakeTask?: (id: string) => Promise<void> | void;
   currentUserId?: string;
+  currentUserEmail?: string;
   isSenior?: boolean;
-  isPrinterAssignedToMe?: boolean;
   onReassign?: () => void;
+  technicians?: Technician[];
 }
 
 const ISSUE_ICONS: Record<string, string> = {
+  "No paper": "file-minus",
+  "No Paper": "file-minus",
+  "No toner ink": "droplet",
+  "Jammed": "alert-circle",
   "Paper Jam": "alert-circle",
+  "Door Opened": "unlock",
+  "Printer Offline": "wifi-off",
   "Offline": "wifi-off",
-  "Ink Low": "droplet",
-  "Paper Empty": "file-minus",
-  "Error Code": "x-circle",
-  "Connectivity Issue": "wifi",
-  "Hardware Fault": "tool",
-  "Maintenance Due": "settings",
+  "Low paper": "file-text",
+  "Low Paper": "file-text",
+  "Service Requested": "headphones",
 };
 
-export function TaskCard({ task, onPress, currentUserId, isSenior, isPrinterAssignedToMe, onReassign }: Props) {
-  const isUnassigned = !task.assignedTechnicianId;
-  const isMyTask = task.assignedTechnicianId === currentUserId;
-  const isOverdue = task.takenAt ? (Date.now() - task.takenAt.getTime()) > 30 * 60 * 1000 : false;
+function formatTakenTime(takenAt: Date): string {
+  const mins = Math.floor((Date.now() - takenAt.getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}m ago` : `${h}h ago`;
+}
 
+export function TaskCard({ task, onPress, onTakeTask, currentUserId, currentUserEmail, isSenior, onReassign, technicians = [] }: Props) {
+  const isUnassigned = !task.assignedTechnicianId;
+  const isMyTask = task.assignedTechnicianId === currentUserId || task.assignedTechnicianId === currentUserEmail;
+  const isOverdue = task.takenAt ? (Date.now() - new Date(task.takenAt).getTime()) > 30 * 60 * 1000 : false;
+  const [isTaking, setIsTaking] = useState(false);
   const swipeableRef = useRef<Swipeable>(null);
 
-  const renderLeftActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+  const resolveAssigneeName = (id: string | null): { name: string; initials: string } => {
+    if (!id) return { name: 'Unknown', initials: '??' };
+    const tech = technicians.find(t => t.id === id || t.email === id);
+    if (tech) {
+      const initials = tech.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+      return { name: tech.name, initials };
+    }
+    return { name: id.split('@')[0], initials: id.slice(0, 2).toUpperCase() };
+  };
+
+  const handleTakeTask = async () => {
+    if (!onTakeTask || isTaking) return;
+    setIsTaking(true);
+    try {
+      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await onTakeTask(task.id);
+    } catch (err) { } finally {
+      setIsTaking(false);
+    }
+  };
+
+  const renderRightActions = (progress: any, dragX: any) => {
     const scale = dragX.interpolate({
-      inputRange: [0, 80],
-      outputRange: [0.5, 1],
+      inputRange: [-100, 0],
+      outputRange: [1, 0],
       extrapolate: 'clamp',
     });
 
     return (
-      <View style={styles.shareActionContainer}>
-        <Animated.View style={[styles.shareActionContent, { transform: [{ scale }] }]}>
-          <Feather name="share" size={24} color={Colors.white} />
-          <Text style={styles.shareActionText}>Share</Text>
+      <View style={styles.shareAction}>
+        <Animated.View style={{ transform: [{ scale }] }}>
+          <Feather name="share-2" size={24} color={Colors.white} />
+          <Text style={styles.shareText}>Share</Text>
         </Animated.View>
       </View>
     );
   };
 
-  const handleSwipeOpen = (direction: 'left' | 'right') => {
-    if (direction === 'left' && onReassign) {
-      setTimeout(() => {
-        swipeableRef.current?.close();
-        onReassign();
-      }, 150);
-    }
-  };
-
   return (
     <Swipeable
       ref={swipeableRef}
-      renderLeftActions={onReassign ? renderLeftActions : undefined}
-      onSwipeableOpen={handleSwipeOpen}
-      leftThreshold={80}
-      containerStyle={styles.swipeContainer}
-      enabled={!!onReassign}
+      renderRightActions={renderRightActions}
+      onSwipeableOpen={(direction) => {
+        if (direction === 'right') {
+          swipeableRef.current?.close();
+          onReassign?.();
+        }
+      }}
     >
       <Pressable
-      style={({ pressed }) => [
-        styles.card, 
-        pressed && styles.cardPressed
-      ]}
-      onPress={onPress}
-    >
-
-      {task.customerWaiting && (
-        <View style={styles.waitingBanner}>
-          <Feather name="user" size={10} color={Colors.white} />
-          <Text style={styles.waitingText}>Customer Waiting</Text>
-        </View>
-      )}
-
-      <View style={styles.header}>
-        <View style={styles.printerInfo}>
-          <View style={[styles.iconBox, { backgroundColor: getPriorityColors(task.priority).bg }]}>
-            <Feather
-              name={ISSUE_ICONS[task.issueType] as any || "printer"}
-              size={16}
-              color={getPriorityColors(task.priority).text}
-            />
-          </View>
-          <View>
-            <Text style={styles.printerId}>{task.printerId}</Text>
-            <View style={styles.locationRow}>
-              <Feather name="map-pin" size={10} color={Colors.textTertiary} />
-              <Text style={styles.location}>{task.location}</Text>
+        style={({ pressed }) => [
+          styles.card, 
+          pressed && styles.cardPressed
+        ]}
+        onPress={onPress}
+      >
+        <View style={styles.header}>
+          <View style={styles.printerInfo}>
+            <View style={[styles.iconBox, { backgroundColor: getPriorityColors(task.priority).bg }]}>
+              <Feather
+                name={ISSUE_ICONS[task.issueType] as any || "printer"}
+                size={16}
+                color={getPriorityColors(task.priority).text}
+              />
             </View>
-          </View>
-        </View>
-        <PriorityBadge priority={task.priority} size="sm" />
-      </View>
-
-      <View style={styles.issueRow}>
-        <Text style={styles.issueType}>{task.issueType}</Text>
-        <StatusBadge status={task.status} />
-      </View>
-
-      <View style={styles.footer}>
-        <View style={styles.footerLeft}>
-          {task.assignedTechnicianName ? (
-            <View style={styles.techRow}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {task.assignedTechnicianName.split(" ").map(n => n[0]).join("").slice(0, 2)}
-                </Text>
+            <View>
+              <Text style={styles.printerId}>{task.printerId}</Text>
+              <View style={styles.locationRow}>
+                <Feather name="map-pin" size={10} color={Colors.textTertiary} />
+                <Text style={styles.location}>{task.location}</Text>
               </View>
-              <Text style={styles.techName} numberOfLines={1}>{isMyTask ? "You" : task.assignedTechnicianName}</Text>
             </View>
-          ) : (
-            <Text style={styles.unassignedText}>Unassigned</Text>
-          )}
+          </View>
+          <PriorityBadge priority={task.priority} size="sm" />
         </View>
 
-        <View style={styles.footerRight}>
-          {task.takenAt ? (
-            <LiveTimer startTime={task.takenAt} isUrgent={isOverdue} compact />
-          ) : (
-            <LiveTimer startTime={task.createdAt} compact />
-          )}
+        <View style={styles.issueRow}>
+          <Text style={styles.issueType}>{task.issueType}</Text>
+          <StatusBadge status={task.status} />
         </View>
-      </View>
 
+        <View style={styles.footer}>
+          <View style={styles.footerLeft}>
+            {!isUnassigned ? (() => {
+              const { name, initials } = resolveAssigneeName(task.assignedTechnicianId);
+              return (
+                <View style={styles.assigneeContainer}>
+                  <View style={[styles.avatar, isMyTask && styles.avatarMe]}>
+                    <Text style={[styles.avatarText, isMyTask && styles.avatarTextMe]}>{initials}</Text>
+                  </View>
+                  <View style={styles.assigneeInfo}>
+                    <Text style={[styles.techName, isMyTask && styles.techNameMe]} numberOfLines={1}>
+                      {isMyTask ? 'You' : name}
+                    </Text>
+                    {task.takenAt && (
+                      <Text style={styles.takenAtLabel}>since {formatTakenTime(new Date(task.takenAt))}</Text>
+                    )}
+                  </View>
+                  {isMyTask && (
+                    <View style={styles.youBadge}>
+                      <Text style={styles.youBadgeText}>ON IT</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })() : (
+              <Pressable
+                style={[styles.takeTaskBtn, isTaking && styles.takeTaskBtnLoading]}
+                onPress={handleTakeTask}
+                disabled={isTaking}
+              >
+                {isTaking ? (
+                  <ActivityIndicator size="small" color={Colors.white} />
+                ) : (
+                  <Feather name="plus-circle" size={14} color={Colors.white} />
+                )}
+                <Text style={styles.takeTaskText}>{isTaking ? 'Taking...' : 'Take Task'}</Text>
+              </Pressable>
+            )}
+          </View>
 
-
-      {!isUnassigned && isMyTask && isOverdue && (
-        <View style={styles.takeoverRow}>
-          <Feather name="alert-triangle" size={12} color={Colors.priorityHigh} />
-          <Text style={styles.takeoverText}>Task delayed — consider escalation</Text>
+          <View style={styles.footerRight}>
+             <LiveTimer startTime={task.takenAt || task.createdAt} isUrgent={isOverdue} compact />
+          </View>
         </View>
-      )}
       </Pressable>
     </Swipeable>
   );
 }
 
 const styles = StyleSheet.create({
-  swipeContainer: {
-    marginBottom: 10,
-    borderRadius: 16,
-    backgroundColor: Colors.primary, // Base for the share action
-  },
-  shareActionContainer: {
-    flex: 1,
-    backgroundColor: Colors.primary, // The "blue" requested by the user
-    justifyContent: 'center',
-    borderRadius: 16,
-    paddingLeft: 24,
-  },
-  shareActionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  shareActionText: {
-    color: Colors.white,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 16,
-  },
   card: {
     backgroundColor: Colors.white,
     borderRadius: 16,
@@ -188,47 +197,6 @@ const styles = StyleSheet.create({
   },
   cardPressed: {
     opacity: 0.95,
-    transform: [{ scale: 0.99 }],
-  },
-  aiCard: {
-    borderColor: '#8b5cf6',
-    borderWidth: 2,
-    shadowColor: '#8b5cf6',
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  aiBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: '#8b5cf6',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    alignSelf: "flex-start",
-    marginBottom: 4,
-  },
-  aiBannerText: {
-    fontSize: 11,
-    fontFamily: "Inter_700Bold",
-    color: Colors.white,
-  },
-  waitingBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: Colors.priorityHigh,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    alignSelf: "flex-start",
-    marginBottom: -4,
-  },
-  waitingText: {
-    fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.white,
   },
   header: {
     flexDirection: "row",
@@ -285,11 +253,6 @@ const styles = StyleSheet.create({
   footerRight: {
     alignItems: "flex-end",
   },
-  techRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
   avatar: {
     width: 22,
     height: 22,
@@ -303,59 +266,80 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     color: Colors.primary,
   },
+  assigneeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  assigneeInfo: {
+    flex: 1,
+    gap: 1,
+  },
   techName: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
     maxWidth: 120,
   },
-  unassignedText: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
+  techNameMe: {
+    color: '#16a34a',
+    fontFamily: 'Inter_700Bold',
+  },
+  avatarMe: {
+    backgroundColor: '#dcfce7',
+  },
+  avatarTextMe: {
+    color: '#16a34a',
+  },
+  takenAtLabel: {
+    fontSize: 9,
+    fontFamily: 'Inter_400Regular',
     color: Colors.textTertiary,
   },
-  takeBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: Colors.primary,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  takeBtnText: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.white,
-  },
-  takeoverRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: Colors.priorityHighBg,
-    padding: 8,
-    borderRadius: 8,
-  },
-  takeoverText: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
-    color: Colors.priorityHigh,
-  },
-  restrictedLabel: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: Colors.background,
-    paddingVertical: 10,
-    borderRadius: 10,
+  youBadge: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderStyle: "dashed",
+    borderColor: '#86efac',
   },
-  restrictedText: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    color: Colors.textTertiary,
+  youBadgeText: {
+    fontSize: 9,
+    fontFamily: 'Inter_700Bold',
+    color: '#16a34a',
+  },
+  takeTaskBtn: {
+    backgroundColor: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
+  takeTaskBtnLoading: {
+    opacity: 0.7,
+  },
+  takeTaskText: {
+    color: Colors.white,
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+  },
+  shareAction: {
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    borderRadius: 16,
+    marginVertical: 1,
+  },
+  shareText: {
+    color: Colors.white,
+    fontSize: 10,
+    fontFamily: 'Inter_700Bold',
+    marginTop: 4,
   },
 });

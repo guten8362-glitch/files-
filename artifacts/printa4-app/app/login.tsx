@@ -87,7 +87,7 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          <Text style={styles.appName}>Print-Tech Flow</Text>
+          <Text style={styles.appName}>SupportA4</Text>
           <Text style={styles.appSubtitle}>Maintenance Portal</Text>
           <View style={styles.divider} />
           <Text style={styles.welcomeText}>Welcome back, Technician</Text>
@@ -166,7 +166,7 @@ export default function LoginScreen() {
             <Feather name="shield" size={12} color={Colors.textTertiary} />
             <Text style={styles.footerText}>Secured College Network</Text>
           </View>
-          <Text style={styles.footerSub}>IT Department — Print-Tech System v2.1</Text>
+          <Text style={styles.footerSub}>SupportA4 System v2.1</Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

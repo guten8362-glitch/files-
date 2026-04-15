@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>PrintWatch — Printer Monitoring Dashboard</title>
+  <meta name="description" content="Real-time printer issue tracking dashboard with priority alerts and technician management." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-primary: #0a0a14;
+      --bg-secondary: #0f0f1e;
+      --bg-card: #12121f;
+      --bg-card-hover: #161628;
+      --bg-glass: rgba(18, 18, 35, 0.7);
+      --purple-100: #f0e6ff;
+      --purple-400: #b87fff;
+      --purple-500: #9d4edd;
+      --purple-600: #7b2ff7;
+      --purple-700: #6a1de0;
+      --neon-purple: #bf5fff;
+      --neon-violet: #7c3aed;
+      --neon-red: #ff3366;
+      --neon-orange: #ff8c00;
+      --neon-blue: #4c8aff;
+      --text-primary: #f0e9ff;
+      --text-secondary: #8b8ba7;
+      --text-muted: #4a4a6a;
+      --border-subtle: rgba(139, 92, 246, 0.12);
+      --border-glass: rgba(191, 95, 255, 0.2);
+      --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.5);
+      --shadow-purple: 0 0 24px rgba(157, 78, 221, 0.35);
+      --shadow-glow: 0 0 40px rgba(191, 95, 255, 0.2);
+      --radius-card: 20px;
+      --radius-btn: 50px;
+      --nav-height: 80px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      overflow-x: hidden;
+    }
+
+    /* ─── Animated Background ─── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 50% at 10% 0%, rgba(124, 58, 237, 0.18) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 90% 100%, rgba(191, 95, 255, 0.12) 0%, transparent 55%),
+        radial-gradient(ellipse 40% 30% at 50% 50%, rgba(157, 78, 221, 0.06) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ─── Main Container ─── */
+    .app-shell {
+      position: relative;
+      z-index: 1;
+      max-width: 430px;
+      margin: 0 auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: calc(var(--nav-height) + 16px);
+    }
+
+    /* ─── Scrollable Content ─── */
+    .scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 16px;
+      scrollbar-width: none;
+    }
+    .scroll-area::-webkit-scrollbar { display: none; }
+
+    /* ─── Header ─── */
+    .header {
+      padding: 52px 16px 0;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: linear-gradient(180deg, var(--bg-primary) 60%, transparent);
+      padding-bottom: 8px;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--purple-600), var(--neon-purple));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px rgba(191, 95, 255, 0.5);
+      font-size: 18px;
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+    }
+    .brand-name {
+      font-size: 16px;
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--text-primary), var(--neon-purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.3px;
+    }
+    .brand-sub {
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .notif-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: rgba(139, 92, 246, 0.1);
+      border: 1px solid var(--border-glass);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.3s ease;
+      font-size: 17px;
+    }
+    .notif-btn:hover {
+      background: rgba(139, 92, 246, 0.2);
+      box-shadow: 0 0 12px rgba(191, 95, 255, 0.3);
+    }
+    .notif-badge {
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--neon-red);
+      box-shadow: 0 0 8px var(--neon-red);
+      border: 1.5px solid var(--bg-primary);
+    }
+
+    .avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #6a1de0, #bf5fff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      border: 1.5px solid rgba(191, 95, 255, 0.4);
+      box-shadow: 0 0 12px rgba(191, 95, 255, 0.25);
+      transition: box-shadow 0.3s;
+    }
+    .avatar:hover { box-shadow: 0 0 20px rgba(191, 95, 255, 0.5); }
+
+    /* ─── Search Bar ─── */
+    .search-wrap {
+      position: relative;
+      margin-bottom: 16px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 14px 48px 14px 48px;
+      background: rgba(18, 18, 35, 0.85);
+      border: 1.5px solid rgba(139, 92, 246, 0.3);
+      border-radius: 18px;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      outline: none;
+      transition: all 0.35s ease;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 0 0 0 rgba(191, 95, 255, 0);
+    }
+    .search-input::placeholder { color: var(--text-muted); }
+    .search-input:focus {
+      border-color: rgba(191, 95, 255, 0.7);
+      box-shadow: 0 0 0 3px rgba(191, 95, 255, 0.12), 0 0 24px rgba(191, 95, 255, 0.2);
+      background: rgba(22, 22, 45, 0.95);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-secondary);
+      font-size: 16px;
+      pointer-events: none;
+      transition: color 0.3s;
+    }
+    .search-wrap:focus-within .search-icon { color: var(--neon-purple); }
+
+    .search-clear {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(139, 92, 246, 0.2);
+      border: none;
+      color: var(--text-secondary);
+      font-size: 12px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .search-clear.visible { display: flex; }
+    .search-clear:hover { background: rgba(139, 92, 246, 0.4); color: #fff; }
+
+    /* ─── Filter Tabs ─── */
+    .filter-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-bottom: 4px;
+      margin-bottom: 2px;
+    }
+    .filter-row::-webkit-scrollbar { display: none; }
+
+    .filter-tab {
+      flex-shrink: 0;
+      padding: 8px 18px;
+      border-radius: 50px;
+      border: 1.5px solid rgba(139, 92, 246, 0.2);
+      background: rgba(18, 18, 35, 0.6);
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(8px);
+      white-space: nowrap;
+      letter-spacing: 0.2px;
+    }
+    .filter-tab:hover {
+      border-color: rgba(191, 95, 255, 0.45);
+      color: var(--text-primary);
+      background: rgba(139, 92, 246, 0.1);
+    }
+    .filter-tab.active {
+      background: linear-gradient(135deg, rgba(124, 47, 247, 0.35), rgba(191, 95, 255, 0.25));
+      border-color: rgba(191, 95, 255, 0.6);
+      color: var(--neon-purple);
+      box-shadow: 0 0 14px rgba(191, 95, 255, 0.2), inset 0 0 8px rgba(191, 95, 255, 0.08);
+      font-weight: 600;
+    }
+
+    /* ─── Section Label ─── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 22px 0 14px;
+    }
+    .section-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.2px;
+    }
+    .section-count {
+      font-size: 12px;
+      color: var(--text-secondary);
+      background: rgba(139, 92, 246, 0.12);
+      padding: 3px 10px;
+      border-radius: 50px;
+      border: 1px solid rgba(139, 92, 246, 0.2);
+      font-weight: 500;
+    }
+
+    /* ─── Printer Cards ─── */
+    .cards-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .printer-card {
+      position: relative;
+      background: var(--bg-card);
+      border-radius: var(--radius-card);
+      padding: 18px 18px 18px 22px;
+      border: 1px solid rgba(139, 92, 246, 0.1);
+      box-shadow: var(--shadow-card);
+      cursor: pointer;
+      transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+    }
+    .printer-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.04) 0%, transparent 60%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.35s;
+    }
+    .printer-card:hover {
+      transform: translateY(-3px) scale(1.005);
+      border-color: rgba(139, 92, 246, 0.25);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 32px rgba(139, 92, 246, 0.08);
+      background: var(--bg-card-hover);
+    }
+    .printer-card:hover::before { opacity: 1; }
+
+    /* Animated left glow border */
+    .card-border {
+      position: absolute;
+      left: 0;
+      top: 16px;
+      bottom: 16px;
+      width: 4px;
+      border-radius: 0 4px 4px 0;
+      transition: all 0.35s ease;
+    }
+    .printer-card:hover .card-border { top: 10px; bottom: 10px; }
+
+    .priority-high .card-border {
+      background: linear-gradient(180deg, #ff3366, #ff6699);
+      box-shadow: 0 0 12px rgba(255, 51, 102, 0.7), 0 0 24px rgba(255, 51, 102, 0.35);
+    }
+    .priority-medium .card-border {
+      background: linear-gradient(180deg, #ff8c00, #ffb347);
+      box-shadow: 0 0 12px rgba(255, 140, 0, 0.7), 0 0 24px rgba(255, 140, 0, 0.35);
+    }
+    .priority-low .card-border {
+      background: linear-gradient(180deg, #7c3aed, #bf5fff);
+      box-shadow: 0 0 12px rgba(124, 58, 237, 0.7), 0 0 24px rgba(124, 58, 237, 0.35);
+    }
+
+    .priority-high:hover .card-border {
+      box-shadow: 0 0 18px rgba(255, 51, 102, 0.9), 0 0 36px rgba(255, 51, 102, 0.5);
+    }
+    .priority-medium:hover .card-border {
+      box-shadow: 0 0 18px rgba(255, 140, 0, 0.9), 0 0 36px rgba(255, 140, 0, 0.5);
+    }
+    .priority-low:hover .card-border {
+      box-shadow: 0 0 18px rgba(124, 58, 237, 0.9), 0 0 36px rgba(124, 58, 237, 0.5);
+    }
+
+    /* Subtle corner glow for high priority */
+    .priority-high::after {
+      content: '';
+      position: absolute;
+      top: -1px;
+      right: -1px;
+      width: 100px;
+      height: 60px;
+      background: radial-gradient(ellipse at top right, rgba(255, 51, 102, 0.08) 0%, transparent 70%);
+      border-radius: 0 var(--radius-card) 0 0;
+      pointer-events: none;
+    }
+
+    .card-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .card-row-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .card-title-group { flex: 1; min-width: 0; }
+
+    .printer-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 3px;
+    }
+
+    .printer-id {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .priority-badge {
+      flex-shrink: 0;
+      padding: 4px 10px;
+      border-radius: 50px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+    .priority-badge.high {
+      background: rgba(255, 51, 102, 0.12);
+      color: #ff6b8a;
+      border: 1px solid rgba(255, 51, 102, 0.3);
+    }
+    .priority-badge.medium {
+      background: rgba(255, 140, 0, 0.12);
+      color: #ffb347;
+      border: 1px solid rgba(255, 140, 0, 0.3);
+    }
+    .priority-badge.low {
+      background: rgba(124, 58, 237, 0.15);
+      color: #a78bfa;
+      border: 1px solid rgba(124, 58, 237, 0.35);
+    }
+
+    .error-msg {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 10px;
+      padding: 7px 10px;
+    }
+    .error-msg.high { background: rgba(255, 51, 102, 0.08); color: #ff8099; }
+    .error-msg.medium { background: rgba(255, 140, 0, 0.08); color: #ffc266; }
+    .error-msg.low { background: rgba(139, 92, 246, 0.1); color: #b899ff; }
+    .error-icon { font-size: 14px; flex-shrink: 0; }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .meta-icon { font-size: 13px; }
+
+    .timer {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .timer-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+    .timer-dot.pulse {
+      background: var(--neon-red);
+      box-shadow: 0 0 6px var(--neon-red);
+      animation: pulse-dot 1.4s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.7); }
+    }
+
+    /* ─── Attend / In Progress button ─── */
+    .attend-btn {
+      align-self: flex-end;
+      padding: 9px 22px;
+      border-radius: var(--radius-btn);
+      background: linear-gradient(135deg, #7b2ff7, #bf5fff);
+      border: none;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 0 16px rgba(191, 95, 255, 0.4), 0 4px 12px rgba(0,0,0,0.3);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      letter-spacing: 0.2px;
+      position: relative;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+    }
+    .attend-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .attend-btn:hover {
+      transform: scale(1.04);
+      box-shadow: 0 0 24px rgba(191, 95, 255, 0.65);
+    }
+    .attend-btn:hover::before { opacity: 1; }
+    .attend-btn:active { transform: scale(0.97); }
+
+    .attend-btn.in-progress {
+      background: rgba(139, 92, 246, 0.15);
+      border: 1.5px solid rgba(191, 95, 255, 0.5);
+      color: var(--neon-purple);
+      box-shadow: 0 0 14px rgba(191, 95, 255, 0.25);
+      cursor: default;
+    }
+    .attend-btn.in-progress:hover { transform: none; }
+
+    .in-progress-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--neon-purple);
+      box-shadow: 0 0 6px var(--neon-purple);
+      margin-right: 6px;
+      vertical-align: middle;
+      animation: pulse-dot 1.4s ease-in-out infinite;
+    }
+
+    /* ─── Stats Row ─── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin: 20px 0 6px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 14px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.3s ease;
+      cursor: default;
+    }
+    .stat-card:hover {
+      border-color: rgba(139, 92, 246, 0.3);
+      box-shadow: 0 0 16px rgba(139, 92, 246, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .stat-icon {
+      font-size: 20px;
+      margin-bottom: 2px;
+    }
+    .stat-value {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, var(--text-primary), var(--neon-purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-align: center;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* ─── Bottom Navigation ─── */
+    .bottom-nav {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      width: calc(100% - 48px);
+      max-width: 382px;
+      background: rgba(15, 15, 28, 0.7);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(139, 92, 246, 0.25);
+      border-radius: 28px;
+      padding: 0 8px;
+      height: 68px;
+      display: flex;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03), 0 0 24px rgba(139, 92, 246, 0.12);
+    }
+
+    .nav-items {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      justify-content: space-around;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 20px;
+      border-radius: 18px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      flex: 1;
+    }
+    .nav-item:hover {
+      background: rgba(139, 92, 246, 0.08);
+    }
+
+    .nav-icon {
+      font-size: 22px;
+      transition: all 0.3s ease;
+      color: var(--text-muted);
+      position: relative;
+    }
+    .nav-label {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: color 0.3s;
+      letter-spacing: 0.3px;
+    }
+
+    .nav-item.active .nav-icon {
+      color: var(--neon-purple);
+      filter: drop-shadow(0 0 8px rgba(191, 95, 255, 0.8));
+    }
+    .nav-item.active .nav-label { color: var(--neon-purple); }
+
+    .nav-item.active {
+      background: rgba(139, 92, 246, 0.12);
+    }
+
+    /* active indicator dot */
+    .nav-item.active::after {
+      content: '';
+      position: absolute;
+      bottom: -12px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--neon-purple);
+      box-shadow: 0 0 8px var(--neon-purple);
+    }
+
+    /* ─── Empty State ─── */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      gap: 12px;
+      display: none;
+    }
+    .empty-state.visible { display: flex; }
+    .empty-icon { font-size: 56px; opacity: 0.3; }
+    .empty-text { font-size: 15px; color: var(--text-muted); font-weight: 500; }
+
+    /* ─── Shimmer effect on load ─── */
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    /* ─── Skeleton ─── */
+    .skeleton {
+      background: linear-gradient(90deg,
+        rgba(255,255,255,0.03) 25%,
+        rgba(139, 92, 246, 0.07) 50%,
+        rgba(255,255,255,0.03) 75%
+      );
+      background-size: 200% 100%;
+      animation: shimmer 1.8s infinite;
+      border-radius: 8px;
+      display: block;
+    }
+
+    /* ─── Floating Action Orb ─── */
+    .fab-orb {
+      position: fixed;
+      bottom: 102px;
+      right: 24px;
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #7b2ff7, #bf5fff);
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(191, 95, 255, 0.5), 0 4px 16px rgba(0,0,0,0.4);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 90;
+    }
+    .fab-orb:hover {
+      transform: translateY(-4px) rotate(8deg);
+      box-shadow: 0 0 32px rgba(191, 95, 255, 0.75), 0 8px 20px rgba(0,0,0,0.5);
+    }
+    .fab-orb:active { transform: scale(0.93); }
+
+    /* ─── Tooltip ─── */
+    .tooltip {
+      position: fixed;
+      bottom: 165px;
+      right: 20px;
+      background: rgba(22, 22, 45, 0.95);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      border-radius: 12px;
+      padding: 8px 14px;
+      font-size: 12px;
+      color: var(--text-primary);
+      font-weight: 500;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      opacity: 0;
+      transform: translateY(6px);
+      pointer-events: none;
+      transition: all 0.25s ease;
+      z-index: 91;
+      white-space: nowrap;
+    }
+    .tooltip.show { opacity: 1; transform: translateY(0); }
+
+    /* ─── Toast notification ─── */
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-80px);
+      background: rgba(22, 22, 45, 0.95);
+      border: 1px solid rgba(191, 95, 255, 0.4);
+      border-radius: 14px;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 16px rgba(191, 95, 255, 0.2);
+      z-index: 999;
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast-icon { font-size: 16px; }
+
+    /* ─── Page Entrance Animation ─── */
+    .printer-card {
+      animation: card-enter 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+    }
+    @keyframes card-enter {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .printer-card:nth-child(1) { animation-delay: 0.05s; }
+    .printer-card:nth-child(2) { animation-delay: 0.1s; }
+    .printer-card:nth-child(3) { animation-delay: 0.15s; }
+    .printer-card:nth-child(4) { animation-delay: 0.2s; }
+    .printer-card:nth-child(5) { animation-delay: 0.25s; }
+
+    /* ─── Responsive ─── */
+    @media (min-width: 500px) {
+      .app-shell { box-shadow: 0 0 80px rgba(0,0,0,0.6); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ── HEADER ── -->
+  <div class="header">
+    <div class="header-top">
+      <div class="brand">
+        <div class="brand-icon">🖨️</div>
+        <div class="brand-text">
+          <span class="brand-name">PrintWatch</span>
+          <span class="brand-sub">Monitoring Dashboard</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="notif-btn" id="notifBtn" title="Notifications">
+          🔔
+          <div class="notif-badge"></div>
+        </div>
+        <div class="avatar" title="Profile">RK</div>
+      </div>
+    </div>
+
+    <!-- Search -->
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input
+        class="search-input"
+        id="searchInput"
+        type="text"
+        placeholder="Search printers, locations…"
+        autocomplete="off"
+      />
+      <button class="search-clear" id="searchClear" aria-label="Clear search">✕</button>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="filter-row" id="filterRow" role="tablist">
+      <button class="filter-tab active" data-filter="all" role="tab">All</button>
+      <button class="filter-tab" data-filter="no-ink" role="tab">No Ink</button>
+      <button class="filter-tab" data-filter="no-paper" role="tab">No Paper</button>
+      <button class="filter-tab" data-filter="jammed" role="tab">Paper Jam</button>
+      <button class="filter-tab" data-filter="offline" role="tab">Offline</button>
+      <button class="filter-tab" data-filter="others" role="tab">Others</button>
+    </div>
+  </div>
+
+  <!-- ── SCROLL CONTENT ── -->
+  <div class="scroll-area">
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon">🔴</div>
+        <div class="stat-value" id="statHigh">3</div>
+        <div class="stat-label">Critical</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🟠</div>
+        <div class="stat-value" id="statMed">2</div>
+        <div class="stat-label">Medium</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🟣</div>
+        <div class="stat-value" id="statLow">2</div>
+        <div class="stat-label">Low</div>
+      </div>
+    </div>
+
+    <!-- Cards List -->
+    <div class="section-header">
+      <span class="section-title">Active Issues</span>
+      <span class="section-count" id="sectionCount">7 printers</span>
+    </div>
+
+    <div class="cards-list" id="cardsList"></div>
+
+    <!-- Empty State -->
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">🖨️</div>
+      <div class="empty-text">No printers match your filter</div>
+    </div>
+
+    <div style="height: 12px;"></div>
+  </div>
+
+</div>
+
+<!-- ── FAB ── -->
+<button class="fab-orb" id="fabBtn" title="Add Issue">➕</button>
+<div class="tooltip" id="fabTooltip">Report a New Issue</div>
+
+<!-- ── Bottom Nav ── -->
+<div class="bottom-nav">
+  <div class="nav-items">
+    <div class="nav-item active" id="nav-printers" data-nav="printers">
+      <div class="nav-icon">🖨️</div>
+      <div class="nav-label">Printers</div>
+    </div>
+    <div class="nav-item" id="nav-location" data-nav="location">
+      <div class="nav-icon">📍</div>
+      <div class="nav-label">Location</div>
+    </div>
+    <div class="nav-item" id="nav-profile" data-nav="profile">
+      <div class="nav-icon">👤</div>
+      <div class="nav-label">Profile</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div class="toast" id="toast">
+  <span class="toast-icon">✅</span>
+  <span id="toastMsg">Action performed</span>
+</div>
+
+<script>
+  // ─── DATA ────────────────────────────────────────────
+  const PRINTERS = [
+    {
+      id: 'PRN-001',
+      name: 'HP LaserJet Pro M404',
+      error: 'Out of Ink — Replace Cyan Cartridge',
+      errorType: 'no-ink',
+      location: 'Floor 3 — Room 302',
+      elapsed: '2 min ago',
+      priority: 'high',
+      attending: false,
+    },
+    {
+      id: 'PRN-002',
+      name: 'Canon imageRUNNER 2625',
+      error: 'Paper Tray A is Empty',
+      errorType: 'no-paper',
+      location: 'Floor 1 — Reception',
+      elapsed: '8 min ago',
+      priority: 'high',
+      attending: true,
+    },
+    {
+      id: 'PRN-003',
+      name: 'Epson WorkForce WF-7840',
+      error: 'Paper Jam — Front Access Panel',
+      errorType: 'jammed',
+      location: 'Floor 2 — Boardroom',
+      elapsed: '15 min ago',
+      priority: 'high',
+      attending: false,
+    },
+    {
+      id: 'PRN-004',
+      name: 'Brother MFC-L2750DW',
+      error: 'Low Toner — Less than 10% remaining',
+      errorType: 'no-ink',
+      location: 'Floor 4 — IT Dept',
+      elapsed: '22 min ago',
+      priority: 'medium',
+      attending: false,
+    },
+    {
+      id: 'PRN-005',
+      name: 'Ricoh SP 330DN',
+      error: 'Device Offline — Network timeout',
+      errorType: 'offline',
+      location: 'Floor 2 — HR Office',
+      elapsed: '34 min ago',
+      priority: 'medium',
+      attending: false,
+    },
+    {
+      id: 'PRN-006',
+      name: 'Lexmark B2236dw',
+      error: 'Maintenance Roller Needs Replacement',
+      errorType: 'others',
+      location: 'Floor 5 — Archive Room',
+      elapsed: '1 hr ago',
+      priority: 'low',
+      attending: false,
+    },
+    {
+      id: 'PRN-007',
+      name: 'Xerox VersaLink C405',
+      error: 'Firmware Update Pending — Reboot Required',
+      errorType: 'others',
+      location: 'Floor 1 — Lobby',
+      elapsed: '2 hrs ago',
+      priority: 'low',
+      attending: false,
+    },
+  ];
+
+  const ERROR_ICONS = {
+    'no-ink': '🖋️',
+    'no-paper': '📄',
+    'jammed': '⚠️',
+    'offline': '📶',
+    'others': '🔧',
+  };
+
+  // ─── STATE ───────────────────────────────────────────
+  let currentFilter = 'all';
+  let searchQuery = '';
+  const attendingSet = new Set(PRINTERS.filter(p => p.attending).map(p => p.id));
+
+  // ─── RENDER ──────────────────────────────────────────
+  function getFiltered() {
+    return PRINTERS.filter(p => {
+      const matchFilter = currentFilter === 'all' || p.errorType === currentFilter;
+      const q = searchQuery.toLowerCase();
+      const matchSearch = !q ||
+        p.name.toLowerCase().includes(q) ||
+        p.location.toLowerCase().includes(q) ||
+        p.error.toLowerCase().includes(q) ||
+        p.id.toLowerCase().includes(q);
+      return matchFilter && matchSearch;
+    });
+  }
+
+  function renderCards() {
+    const list = document.getElementById('cardsList');
+    const empty = document.getElementById('emptyState');
+    const count = document.getElementById('sectionCount');
+    const filtered = getFiltered();
+
+    count.textContent = `${filtered.length} printer${filtered.length !== 1 ? 's' : ''}`;
+
+    if (filtered.length === 0) {
+      list.innerHTML = '';
+      empty.classList.add('visible');
+      return;
+    }
+    empty.classList.remove('visible');
+
+    list.innerHTML = filtered.map(p => {
+      const isAttending = attendingSet.has(p.id);
+      const isHighPriority = p.priority === 'high';
+      return `
+        <div class="printer-card priority-${p.priority}" id="card-${p.id}" data-id="${p.id}">
+          <div class="card-border"></div>
+          <div class="card-inner">
+            <div class="card-row-top">
+              <div class="card-title-group">
+                <div class="printer-name">${p.name}</div>
+                <div class="printer-id">${p.id}</div>
+              </div>
+              <div class="priority-badge ${p.priority}">
+                ${p.priority.toUpperCase()}
+              </div>
+            </div>
+
+            <div class="error-msg ${p.priority}">
+              <span class="error-icon">${ERROR_ICONS[p.errorType] || '⚠️'}</span>
+              ${p.error}
+            </div>
+
+            <div class="card-meta">
+              <div class="meta-item">
+                <span class="meta-icon">📍</span>
+                <span>${p.location}</span>
+              </div>
+              <div class="timer">
+                <div class="timer-dot${isHighPriority && !isAttending ? ' pulse' : ''}"></div>
+                ${p.elapsed}
+              </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end;">
+              ${isAttending
+                ? `<button class="attend-btn in-progress" disabled>
+                     <span class="in-progress-dot"></span>In Progress
+                   </button>`
+                : `<button class="attend-btn" onclick="handleAttend('${p.id}')">
+                     Attend →
+                   </button>`
+              }
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function updateStats() {
+    const high = PRINTERS.filter(p => p.priority === 'high').length;
+    const med  = PRINTERS.filter(p => p.priority === 'medium').length;
+    const low  = PRINTERS.filter(p => p.priority === 'low').length;
+    document.getElementById('statHigh').textContent = high;
+    document.getElementById('statMed').textContent  = med;
+    document.getElementById('statLow').textContent  = low;
+  }
+
+  // ─── ACTIONS ─────────────────────────────────────────
+  function handleAttend(id) {
+    attendingSet.add(id);
+    const printer = PRINTERS.find(p => p.id === id);
+    renderCards();
+    showToast(`🖨️ You're attending ${printer?.name || id}`);
+  }
+
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    document.getElementById('toastMsg').textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3200);
+  }
+
+  // ─── FILTER TABS ─────────────────────────────────────
+  document.getElementById('filterRow').addEventListener('click', e => {
+    const tab = e.target.closest('.filter-tab');
+    if (!tab) return;
+    document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentFilter = tab.dataset.filter;
+    renderCards();
+  });
+
+  // ─── SEARCH ──────────────────────────────────────────
+  const searchInput = document.getElementById('searchInput');
+  const searchClear = document.getElementById('searchClear');
+
+  searchInput.addEventListener('input', () => {
+    searchQuery = searchInput.value;
+    searchClear.classList.toggle('visible', searchQuery.length > 0);
+    renderCards();
+  });
+
+  searchClear.addEventListener('click', () => {
+    searchInput.value = '';
+    searchQuery = '';
+    searchClear.classList.remove('visible');
+    searchInput.focus();
+    renderCards();
+  });
+
+  // ─── BOTTOM NAV ──────────────────────────────────────
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      item.classList.add('active');
+      const nav = item.dataset.nav;
+      if (nav === 'location') showToast('📍 Map view coming soon');
+      if (nav === 'profile') showToast('👤 Profile settings coming soon');
+      if (nav === 'printers') {} // already on printers
+    });
+  });
+
+  // ─── FAB ─────────────────────────────────────────────
+  const fabBtn = document.getElementById('fabBtn');
+  const fabTooltip = document.getElementById('fabTooltip');
+  let tooltipTimer;
+
+  fabBtn.addEventListener('mouseenter', () => {
+    clearTimeout(tooltipTimer);
+    fabTooltip.classList.add('show');
+  });
+  fabBtn.addEventListener('mouseleave', () => {
+    tooltipTimer = setTimeout(() => fabTooltip.classList.remove('show'), 300);
+  });
+  fabBtn.addEventListener('click', () => {
+    fabTooltip.classList.remove('show');
+    showToast('➕ New issue report — coming soon!');
+  });
+
+  // ─── NOTIFICATION BTN ────────────────────────────────
+  document.getElementById('notifBtn').addEventListener('click', () => {
+    showToast('🔔 3 unread alerts');
+  });
+
+  // ─── INIT ────────────────────────────────────────────
+  updateStats();
+  renderCards();
+</script>
+</body>
+</html>
