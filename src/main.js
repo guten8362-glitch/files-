@@ -34,7 +34,8 @@ function getMappedIssueType(value) {
     return ERROR_CODE_MAP[code] || value;
 }
 
-function getRule(issueType) {
+function getRule(rawType) {
+    const issueType = getMappedIssueType(rawType);
     const s = String(issueType || '').toLowerCase();
     return PRIORITY_RULES.find(r => s.includes(r.type.toLowerCase())) || { priority: 7, label: '⚡ TASK', color: 'Grey' };
 }
@@ -152,13 +153,16 @@ export default async ({ req, res, log, error }) => {
         const isChange = eventHeader.includes('create') || eventHeader.includes('update');
 
         if (isMaintenance && isChange) {
-            // Check for error_type, error_code, or flag
-            const rawError = payload.error_type || payload.error_code || payload.flag || '';
+            // Check multiple possible fields for the error code
+            const rawError = payload.error_type || payload.error_code || payload.flag || payload.errorCode || payload.issue_type || '';
+            const rule = getRule(rawError);
             const errorType = getMappedIssueType(rawError);
 
-            if (isHighPriority(errorType)) {
-                log(`[Event] HIGH PRIORITY detected (${errorType}) [Original: ${rawError}]`);
+            if (rule.priority <= 5) {
+                log(`[Event] HIGH PRIORITY detected: ${errorType} (P${rule.priority}) [Original: ${rawError}]`);
                 await dispatchPushNotification(databases, messaging, usersApi, DATABASE_ID, USERS_COL, FCM_PROVIDER_ID, errorType, payload, log, error);
+            } else {
+                log(`[Event] Normal priority: ${errorType} (P${rule.priority})`);
             }
         }
         return res.json({ success: true });
@@ -176,7 +180,21 @@ export default async ({ req, res, log, error }) => {
 
         if (path === '/tasks' && method === 'GET') {
             const result = await databases.listDocuments(DATABASE_ID, TASKS_COL, [Query.limit(100), Query.orderDesc('$createdAt')]);
-            return res.json({ success: true, tasks: result.documents });
+            
+            // Map the tasks to include human-readable error types and priorities
+            const mappedTasks = result.documents.map(doc => {
+                const rawError = doc.error_type || doc.error_code || doc.flag || doc.errorCode || '';
+                const mappedType = getMappedIssueType(rawError);
+                const rule = getRule(rawError);
+                return { 
+                    ...doc, 
+                    error_type: mappedType, // Overwrite with human-readable string
+                    priority_level: rule.priority,
+                    priority_label: rule.label
+                };
+            });
+
+            return res.json({ success: true, tasks: mappedTasks });
         }
 
         // Register push token (Target)
