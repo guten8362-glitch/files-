@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useApp, TaskStatus, Technician } from "@/context/AppContext";
 import { TaskCard } from "@/components/TaskCard";
+import { playNotificationSound } from "@/lib/notifications";
 
 
 
@@ -33,9 +34,17 @@ export default function TasksScreen() {
       list = list.filter(t =>
         !t.assignedTechnicianId || 
         t.assignedTechnicianId === currentUser?.id ||
-        t.assignedTechnicianId === currentUser?.email // email check as fallback
+        t.assignedTechnicianId === currentUser?.email
       );
     }
+
+    // Sort by priority ascending: P1 (most urgent) at top → P7 (least urgent) at bottom
+    // Within same priority, oldest tasks first
+    list = [...list].sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+
     return list;
   }, [tasks, currentUser]);
 
@@ -80,6 +89,17 @@ export default function TasksScreen() {
               <Feather name="help-circle" size={16} color={Colors.primary} />
               <Text style={[styles.assistBtnText, { color: Colors.primary }]}>Help</Text>
             </Pressable>
+            {/* 🔔 Sound test button — tap to verify notification.mp3 plays */}
+            <Pressable
+              style={[styles.assistBtn, { backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#86efac' }]}
+              onPress={() => {
+                playNotificationSound();
+                if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              }}
+            >
+              <Feather name="bell" size={16} color="#16a34a" />
+              <Text style={[styles.assistBtnText, { color: '#16a34a' }]}>Test Sound</Text>
+            </Pressable>
             <Pressable
               style={styles.logoutBtn}
               onPress={handleLogout}
@@ -104,6 +124,7 @@ export default function TasksScreen() {
             onTakeTask={(id) => takeTask(id)}
             currentUserId={currentUser?.id}
             currentUserEmail={currentUser?.email}
+            currentUserName={currentUser?.name}
             isSenior={currentUser?.role === "Senior Technician"}
             isPrinterAssignedToMe={false}
             onReassign={() => openReassign(item.id)}

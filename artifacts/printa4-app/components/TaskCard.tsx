@@ -16,6 +16,7 @@ interface Props {
   onTakeTask?: (id: string) => Promise<void> | void;
   currentUserId?: string;
   currentUserEmail?: string;
+  currentUserName?: string;
   isSenior?: boolean;
   onReassign?: () => void;
   technicians?: Technician[];
@@ -44,7 +45,7 @@ function formatTakenTime(takenAt: Date): string {
   return m > 0 ? `${h}h ${m}m ago` : `${h}h ago`;
 }
 
-export function TaskCard({ task, onPress, onTakeTask, currentUserId, currentUserEmail, isSenior, onReassign, technicians = [] }: Props) {
+export function TaskCard({ task, onPress, onTakeTask, currentUserId, currentUserEmail, currentUserName, isSenior, onReassign, technicians = [] }: Props) {
   const isUnassigned = !task.assignedTechnicianId;
   const isMyTask = task.assignedTechnicianId === currentUserId || task.assignedTechnicianId === currentUserEmail;
   const isOverdue = task.takenAt ? (Date.now() - new Date(task.takenAt).getTime()) > 30 * 60 * 1000 : false;
@@ -53,12 +54,18 @@ export function TaskCard({ task, onPress, onTakeTask, currentUserId, currentUser
 
   const resolveAssigneeName = (id: string | null): { name: string; initials: string } => {
     if (!id) return { name: 'Unknown', initials: '??' };
+    // If this ID belongs to the current user, use their display name
+    if ((id === currentUserId || id === currentUserEmail) && currentUserName) {
+      const initials = currentUserName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+      return { name: currentUserName, initials };
+    }
     const tech = technicians.find(t => t.id === id || t.email === id);
     if (tech) {
-      const initials = tech.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+      const initials = tech.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
       return { name: tech.name, initials };
     }
-    return { name: id.split('@')[0], initials: id.slice(0, 2).toUpperCase() };
+    // Fallback: show partial ID
+    return { name: id.includes('@') ? id.split('@')[0] : id, initials: id.slice(0, 2).toUpperCase() };
   };
 
   const handleTakeTask = async () => {
@@ -117,7 +124,7 @@ export function TaskCard({ task, onPress, onTakeTask, currentUserId, currentUser
               />
             </View>
             <View>
-              <Text style={styles.printerId}>{task.printerId}</Text>
+              <Text style={styles.printerId}>{task.printerName}</Text>
               <View style={styles.locationRow}>
                 <Feather name="map-pin" size={10} color={Colors.textTertiary} />
                 <Text style={styles.location}>{task.location}</Text>
@@ -129,7 +136,6 @@ export function TaskCard({ task, onPress, onTakeTask, currentUserId, currentUser
 
         <View style={styles.issueRow}>
           <Text style={styles.issueType}>{task.issueType}</Text>
-          <StatusBadge status={task.status} />
         </View>
 
         <View style={styles.footer}>

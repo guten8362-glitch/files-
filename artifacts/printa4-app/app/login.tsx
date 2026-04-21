@@ -27,8 +27,16 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      setError("Please enter your email and password.");
+    if (!email.trim()) {
+      setError("Please enter your email address.");
+      return;
+    }
+    if (!password.trim()) {
+      setError("Please enter your password.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long.");
       return;
     }
     setError("");
@@ -45,6 +53,13 @@ export default function LoginScreen() {
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
+      }
+    } catch (err: any) {
+      // Show Appwrite or network errors in the UI
+      const msg = err?.message || "Login failed. Please try again.";
+      setError(msg);
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } finally {
       setLoading(false);

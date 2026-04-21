@@ -1,8 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
-import * as Notifications from 'expo-notifications';
-import { APPWRITE, listDocuments, updateDocument, executeFunction, appwriteDatabases } from "@/lib/appwrite";
+import { registerNotificationChannels, configureNotificationHandler, playNotificationSound } from '@/lib/notifications';
+import { APPWRITE, listDocuments, updateDocument, executeFunction, createSession } from "@/lib/appwrite";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const DATABASE_ID = APPWRITE.databaseId;
@@ -27,7 +27,7 @@ export interface Technician {
 }
 
 export interface PrinterTask {
-  id: string; printerId: string; location: string; issueType: IssueType;
+  id: string; printerId: string; printerName: string; location: string; issueType: IssueType;
   priority: number; status: TaskStatus; assignedTechnicianId: string | null;
   assignedTechnicianName: string | null; createdAt: Date; takenAt: Date | null;
   completedAt: Date | null; customerWaiting: boolean; notes?: string;
@@ -63,19 +63,65 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | null>(null);
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
-const mapTask = (doc: any): PrinterTask => {
+// ─── Priority from Issue Type ────────────────────────────────────────────────
+/**
+ * Auto-derive priority from the error type when the DB field is missing/0.
+ * P1 = most urgent, P7 = least urgent.
+ */
+const ISSUE_PRIORITY_MAP: Record<string, number> = {
+  // P1 — Critical: No paper at all, printer completely unusable
+  "No Paper":           1,
+  "No paper":           1,
+  "Paper Empty":        1,
+  // P2 — Critical: Someone asked for service
+  "Service Requested":  2,
+  // P3 — Warning: Paper jam blocks all printing
+  "Paper Jam":          3,
+  "Jammed":             3,
+  // P4 — Warning: Door left open
+  "Door Opened":        4,
+  // P5 — Info: Toner running out (still works, not urgent)
+  "No toner ink":       5,
+  "Low toner ink":      5,
+  "Ink Low":            5,
+  // P6 — Info: Printer offline / connectivity
+  "Printer Offline":    6,
+  "Offline":            6,
+  "Connectivity Issue": 6,
+  // P7 — Low: Low paper (still working, just a warning)
+  "Low Paper":          7,
+  "Low paper":          7,
+};
+
+function derivePriority(errorType: string, dbPriority: any): number {
+  // If Appwrite has a valid numeric priority (1–7), use it
+  const num = Number(dbPriority);
+  if (num >= 1 && num <= 7) return num;
+  // Otherwise derive from the issue type
+  return ISSUE_PRIORITY_MAP[errorType] ?? 7;
+}
+
+
+const mapTask = (doc: any, printerDocs: any[] = []): PrinterTask => {
   const status: TaskStatus = doc.printerFixed ? "Completed" : (doc.employee_one ? "Assigned" : "Unassigned");
+  const printerId = doc.printer_id || "Unknown";
+  // Look up the printer name from the printers collection
+  const matchedPrinter = printerDocs.find(
+    (p) => p.$id === printerId || p.printer_id === printerId
+  );
+  const printerName = matchedPrinter?.name || printerId;
   return {
     id: doc.$id,
-    printerId: doc.printer_id || "Unknown",
+    printerId,
+    printerName,
     location: doc.location || "Unknown",
     issueType: doc.error_type || "Issue",
-    priority: Number(doc.priority) || 7,
+    priority: derivePriority(doc.error_type || "", doc.priority),
     status,
     assignedTechnicianId: doc.employee_one || null,
     assignedTechnicianName: doc.employee_one || null,
     createdAt: new Date(doc.startTime || doc.$createdAt),
-    takenAt: doc.takenAt ? new Date(doc.takenAt) : null,
+    takenAt: doc.employee_one ? new Date(doc.$updatedAt) : null,
     completedAt: doc.printerFixed ? new Date(doc.$updatedAt) : null,
     customerWaiting: Number(doc.priority) <= 2,
     building: doc.building || "-",
@@ -100,18 +146,26 @@ const mapPrinter = (doc: any): PrinterHealth => ({
   errorHistory: [], // FIXED: STOP CRASH
 });
 
-const mapTechnician = (doc: any): Technician => ({
-  id: doc.$id,
-  name: doc.name || "Unknown",
-  email: doc.email || "",
-  status: doc.status || "Offline",
-  avatar: doc.name ? doc.name[0] : "?",
-  tasksCompleted: 0,
-  avgResponseTime: 0,
-  successRate: 0,
-  currentTasks: [],
-  phone: doc.phone || ""
-});
+const mapTechnician = (doc: any): Technician => {
+  // users collection has no 'name' field — derive display name from email
+  const rawName =
+    doc.name ||
+    (doc.email
+      ? doc.email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+      : "Unknown");
+  return {
+    id: doc.$id,
+    name: rawName,
+    email: doc.email || "",
+    status: doc.status || "Available",
+    avatar: rawName[0] || "?",
+    tasksCompleted: 0,
+    avgResponseTime: 0,
+    successRate: 0,
+    currentTasks: [],
+    phone: doc.phone || "",
+  };
+};
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -128,20 +182,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       const session = await AsyncStorage.getItem("sessionSecret") || sessionSecret || undefined;
 
-      // Tasks
+      // Fetch printers first so tasks can resolve printer names
+      let pDocs: any[] = [];
       try {
-        const tDocs = await listDocuments(TASKS_COL, session);
-        setTasks(tDocs.map(mapTask));
-      } catch (e) { console.error("Tasks fetch failed", e); }
-
-      // Printers
-      try {
-        const pDocs = await listDocuments(PRINTERS_COL, session);
+        pDocs = await listDocuments(PRINTERS_COL, session);
         setPrinters(pDocs.map(mapPrinter));
       } catch (e) { 
         console.error("Printers fetch failed", e);
-        // Fallback or empty list
       }
+
+      // Tasks — pass printer docs so names can be resolved
+      try {
+        const tDocs = await listDocuments(TASKS_COL, session);
+        setTasks(tDocs.map((doc) => mapTask(doc, pDocs)));
+      } catch (e) { console.error("Tasks fetch failed", e); }
 
       // Users
       try {
@@ -156,23 +210,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const setupRealtime = () => {
     if (wsRef.current) wsRef.current.close();
-    
-    // Register the channel with sound - VERSION 2 to force update
-    if (Platform.OS === 'android') {
-      Notifications.setNotificationChannelAsync('priority_alerts_v2', {
-        name: 'Priority Alerts',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-        sound: 'notification.wav', 
-      });
-    }
+
+    // Set up foreground notification display behaviour
+    configureNotificationHandler();
+
+    // Register Android notification channels with custom sound
+    registerNotificationChannels();
 
     const url = `wss://nyc.cloud.appwrite.io/v1/realtime?project=${APPWRITE.projectId}&channels[]=databases.${DATABASE_ID}.collections.${TASKS_COL}.documents&channels[]=databases.${DATABASE_ID}.collections.${PRINTERS_COL}.documents`;
     const ws = new WebSocket(url, [], { headers: { Origin: "http://localhost" } } as any);
     ws.onmessage = (e) => {
-       const msg = JSON.parse(e.data);
-       if (msg.type === "event") refreshData();
+      const msg = JSON.parse(e.data);
+      if (msg.type === "event") {
+        // Play custom sound when a new task/printer event arrives while app is open
+        playNotificationSound();
+        refreshData();
+      }
     };
     wsRef.current = ws;
   };
@@ -193,11 +246,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    // Basic mock login for now - would normally call Appwrite
-    const user: CurrentUser = { id: "user123", name: email.split('@')[0], email, role: "Technician" };
-    setCurrentUser(user);
+    // Step 1: Create a real Appwrite session
+    const session = await createSession(email, password);
+    const secret = session.secret || session.$id;
+    setSessionSecret(secret);
+    await AsyncStorage.setItem("sessionSecret", secret);
+
+    // Step 2: Fetch all users and find this user's record by email
+    let matchedUser: CurrentUser | null = null;
+    try {
+      const uDocs = await listDocuments(USERS_COL, secret);
+      const found = uDocs.find(
+        (doc: any) => (doc.email || "").toLowerCase() === email.toLowerCase()
+      );
+      if (found) {
+        const derivedName = found.name ||
+          (found.email || email).split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+        matchedUser = {
+          id: found.$id,              // Real Appwrite document ID
+          name: derivedName,
+          email: found.email || email,
+          role: (found.role === "Senior Technician" ? "Senior Technician" : "Technician"),
+        };
+      }
+    } catch (e) {
+      console.warn("Could not look up user in users collection", e);
+    }
+
+    // Fallback if user doc not found
+    if (!matchedUser) {
+      matchedUser = {
+        id: email,             // Use email as ID fallback
+        name: email.split("@")[0],
+        email,
+        role: "Technician",
+      };
+    }
+
+    setCurrentUser(matchedUser);
     setIsLoggedIn(true);
-    await AsyncStorage.setItem("currentUser", JSON.stringify(user));
+    await AsyncStorage.setItem("currentUser", JSON.stringify(matchedUser));
     await refreshData();
     return true;
   };
@@ -210,16 +298,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const takeTask = async (taskId: string) => {
     if (!currentUser) return;
-    await appwriteDatabases.updateDocument(DATABASE_ID, TASKS_COL, taskId, {
-      employee_one: currentUser.id,
-      status: "In Progress",
-      takenAt: new Date().toISOString()
-    });
+    const session = await AsyncStorage.getItem("sessionSecret") || sessionSecret || undefined;
+    console.log(`[TakeTask] Assigning task ${taskId} to ${currentUser.name} (${currentUser.id})`);
+    try {
+      await updateDocument(TASKS_COL, taskId, {
+        employee_one: currentUser.id,
+      }, session);
+      console.log(`[TakeTask] ✅ Success — employee_one = ${currentUser.id}`);
+    } catch (e: any) {
+      console.error(`[TakeTask] ❌ Failed:`, e.message);
+      throw e; // re-throw so TaskCard shows error state
+    }
     await refreshData();
   };
 
   const bypassLogin = async () => {
-    const user: CurrentUser = { id: "guest", name: "Guest", email: "guest@support.a4", role: "Senior Technician" };
+    // Try to pick a real user from the DB so Take Task works with a valid ID
+    let user: CurrentUser = { id: "guest", name: "Guest", email: "guest@support.a4", role: "Senior Technician" };
+    try {
+      const uDocs = await listDocuments(USERS_COL);
+      if (uDocs.length > 0) {
+        const first = uDocs[0];
+        const derivedName = first.name ||
+          (first.email || "guest").split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+        user = {
+          id: first.$id,
+          name: derivedName,
+          email: first.email || "guest@support.a4",
+          role: "Senior Technician",
+        };
+        console.log(`[BypassLogin] Using real user: ${user.name} (${user.id})`);
+      }
+    } catch (e) {
+      console.warn("[BypassLogin] Could not fetch users, using guest fallback", e);
+    }
     setCurrentUser(user);
     setIsLoggedIn(true);
     await refreshData();

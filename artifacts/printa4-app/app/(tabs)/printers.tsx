@@ -34,8 +34,8 @@ function PrinterCard({ printer }: { printer: PrinterHealth }) {
           <Feather name="printer" size={20} color={Colors.primary} />
         </View>
         <View style={styles.printerInfo}>
-          <Text style={styles.shopName} numberOfLines={1}>{printer.shopName || "Unnamed Shop"}</Text>
-          <Text style={styles.printerId}>{printer.printerId}</Text>
+          <Text style={styles.shopName} numberOfLines={1}>{printer.printerId}</Text>
+          <Text style={styles.printerId}>{printer.shopName || "Unnamed Shop"}</Text>
           <View style={styles.locationRow}>
             <Feather name="map-pin" size={10} color={Colors.textTertiary} />
             <Text style={styles.location}>{printer.location}</Text>
