@@ -19,7 +19,23 @@ const PRIORITY_RULES = [
     { type: 'Low paper', priority: 6, label: '✅ READY', color: 'Yellow' }
 ];
 
-function getRule(issueType) {
+const ERROR_CODE_MAP = {
+    '5000': 'Service Requested',
+    '5001': 'No paper',
+    '5002': 'Jammed',
+    '5003': 'No Toner',
+    '5004': 'Door Opened',
+    '5005': 'Low paper',
+    '5006': 'Printer Offline'
+};
+
+function getMappedIssueType(value) {
+    const code = String(value || '').trim();
+    return ERROR_CODE_MAP[code] || value;
+}
+
+function getRule(rawType) {
+    const issueType = getMappedIssueType(rawType);
     const s = String(issueType || '').toLowerCase();
     return PRIORITY_RULES.find(r => s.includes(r.type.toLowerCase())) || { priority: 7, label: '⚡ TASK', color: 'Grey' };
 }
@@ -102,8 +118,6 @@ async function dispatchPushNotification(databases, messaging, users, DATABASE_ID
     await sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title, bodyText, data, log, error);
 }
 
-
-
 // ─── Main Handler ─────────────────────────────────────────────────────────────
 export default async ({ req, res, log, error }) => {
     const client = new Client()
@@ -139,10 +153,16 @@ export default async ({ req, res, log, error }) => {
         const isChange = eventHeader.includes('create') || eventHeader.includes('update');
 
         if (isMaintenance && isChange) {
-            const errorType = payload.error_type || '';
-            if (isHighPriority(errorType)) {
-                log(`[Event] HIGH PRIORITY detected (${errorType})`);
+            // Check multiple possible fields for the error code
+            const rawError = payload.error_type || payload.error_code || payload.flag || payload.errorCode || payload.issue_type || '';
+            const rule = getRule(rawError);
+            const errorType = getMappedIssueType(rawError);
+
+            if (rule.priority <= 5) {
+                log(`[Event] HIGH PRIORITY detected: ${errorType} (P${rule.priority}) [Original: ${rawError}]`);
                 await dispatchPushNotification(databases, messaging, usersApi, DATABASE_ID, USERS_COL, FCM_PROVIDER_ID, errorType, payload, log, error);
+            } else {
+                log(`[Event] Normal priority: ${errorType} (P${rule.priority})`);
             }
         }
         return res.json({ success: true });
@@ -177,7 +197,21 @@ export default async ({ req, res, log, error }) => {
 
         if (path === '/tasks' && method === 'GET') {
             const result = await databases.listDocuments(DATABASE_ID, TASKS_COL, [Query.limit(100), Query.orderDesc('$createdAt')]);
-            return res.json({ success: true, tasks: result.documents });
+            
+            // Map the tasks to include human-readable error types and priorities
+            const mappedTasks = result.documents.map(doc => {
+                const rawError = doc.error_type || doc.error_code || doc.flag || doc.errorCode || '';
+                const mappedType = getMappedIssueType(rawError);
+                const rule = getRule(rawError);
+                return { 
+                    ...doc, 
+                    error_type: mappedType, // Overwrite with human-readable string
+                    priority_level: rule.priority,
+                    priority_label: rule.label
+                };
+            });
+
+            return res.json({ success: true, tasks: mappedTasks });
         }
 
         // Register push token (Target)
