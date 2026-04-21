@@ -152,6 +152,23 @@ export default async ({ req, res, log, error }) => {
         if (path === '/ping') {
             return res.json({ status: 'Online', time: new Date().toISOString(), providerId: FCM_PROVIDER_ID });
         }
+        
+        // Register Google/OTP user in `users_collection` securely on first login
+        if (path === '/syncUser' && method === 'POST') {
+            const { userId, email, name } = payload;
+            try {
+                await databases.getDocument(DATABASE_ID, USERS_COL, userId);
+            } catch (err) {
+                // If the user document throws a 404 meaning missing, gently create it:
+                await databases.createDocument(DATABASE_ID, USERS_COL, userId, {
+                    email: email || '',
+                    name: name || 'Technician',
+                    fcmToken: []
+                });
+                log(`[SyncUser] Created new profile for user ${userId}`);
+            }
+            return res.json({ success: true });
+        }
 
         if (path === '/users' && method === 'GET') {
             const result = await databases.listDocuments(DATABASE_ID, USERS_COL, [Query.limit(100)]);
