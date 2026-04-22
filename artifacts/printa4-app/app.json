@@ -20,10 +20,13 @@
       },
       "package": "com.maintance",
       "googleServicesFile": "./google-services.json",
-      "permissions": ["POST_NOTIFICATIONS", "VIBRATE"],
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "VIBRATE"
+      ],
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyCuA1j_Vp1ZMJusVXSfma2snhIB1N37Y4E"
+          "apiKey": "YOUR_API_KEY_HERE"
         }
       }
     },
