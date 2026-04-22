@@ -16,6 +16,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppProvider } from "@/context/AppContext";
 import Colors from "@/constants/colors";
+import { registerNotificationChannels, configureNotificationHandler } from "@/lib/notifications";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -44,9 +45,11 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
-      
-      // Request notification permissions on startup
-      import("@/services/notifications").then(m => m.registerForPushNotificationsAsync());
+
+      // Register channels + configure handler at first launch (before login)
+      // Android caches channels permanently — must run on every cold start
+      configureNotificationHandler();
+      registerNotificationChannels();
     }
   }, [fontsLoaded, fontError]);
 

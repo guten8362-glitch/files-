@@ -9,8 +9,8 @@ import { Platform } from 'react-native';
 const SOUND_FILE = 'notification.wav';
 
 // ─── Android Notification Channels ────────────────────────────────────────────
-export const CHANNEL_HIGH = 'priority_alerts_v2';   // P1–P3 tasks
-export const CHANNEL_NORMAL = 'normal_alerts';       // P4–P7 tasks
+export const CHANNEL_HIGH = 'priority_alerts_v3';   // P1–P3 tasks (bumped to force fresh channel)
+export const CHANNEL_NORMAL = 'normal_alerts_v2';   // P4–P7 tasks
 
 /**
  * Register Android notification channels with custom sounds.
