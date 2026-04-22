@@ -19,7 +19,13 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.maintance",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "permissions": ["POST_NOTIFICATIONS", "VIBRATE"],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCuA1j_Vp1ZMJusVXSfma2snhIB1N37Y4E"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -42,6 +48,7 @@
           ]
         }
       ]
+
     ],
     "experiments": {
       "typedRoutes": false,
@@ -52,9 +59,9 @@
         "origin": "https://replit.com/"
       },
       "eas": {
-        "projectId": "3dc40310-a4ad-4063-bf00-a010090b798a"
+        "projectId": "0d8f7004-6504-42e1-b5a4-595677c22bc4"
       }
     },
-    "owner": "ak5319"
+    "owner": "guten"
   }
 }

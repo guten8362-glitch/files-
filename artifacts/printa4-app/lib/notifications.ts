@@ -58,15 +58,33 @@ export function configureNotificationHandler(): void {
 
 
 /**
- * Play notification.mp3 directly via expo-av.
- * Requires: npm install expo-av  (then restart Metro)
- * Until installed, this is a no-op.
+ * Show a local notification immediately (foreground + background).
+ * Uses expo-notifications — no extra packages needed.
  */
-export async function playNotificationSound(): Promise<void> {
-  // expo-av not yet installed — no-op
-  // After running `npm install expo-av` and restarting Metro,
-  // update this function to use Audio.Sound.createAsync
-  console.log('[Notifications] Sound triggered (expo-av not installed yet — no-op)');
+export async function playNotificationSound(
+  title = '🔔 New Task Alert',
+  body = 'A printer maintenance task needs attention.',
+  isHigh = true
+): Promise<void> {
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: true,   // use channel sound on Android, default on iOS
+        priority: isHigh
+          ? Notifications.AndroidNotificationPriority.MAX
+          : Notifications.AndroidNotificationPriority.DEFAULT,
+      },
+      trigger: null,  // fire immediately
+      ...(Platform.OS === 'android' && {
+        channelId: isHigh ? CHANNEL_HIGH : CHANNEL_NORMAL,
+      }),
+    });
+    console.log('[Notifications] ✅ Local notification scheduled');
+  } catch (err) {
+    console.warn('[Notifications] ❌ Failed to schedule notification:', err);
+  }
 }
 
 // ─── Push Token ───────────────────────────────────────────────────────────────

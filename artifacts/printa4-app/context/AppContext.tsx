@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
-import { registerNotificationChannels, configureNotificationHandler, playNotificationSound } from '@/lib/notifications';
+import { registerNotificationChannels, configureNotificationHandler, playNotificationSound, getPushToken } from '@/lib/notifications';
 import { APPWRITE, listDocuments, updateDocument, executeFunction, createSession } from "@/lib/appwrite";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -241,6 +241,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       await refreshData();
       setupRealtime();
+      // Request notification permission and get push token
+      getPushToken().then(token => {
+        if (token) console.log('[AppContext] Push token ready:', token);
+      });
     };
     init();
   }, []);

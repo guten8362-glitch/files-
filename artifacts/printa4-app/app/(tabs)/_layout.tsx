@@ -1,15 +1,25 @@
 import { BlurView } from "expo-blur";
-import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
-import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
-import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
-
 import Colors from "@/constants/colors";
 
+// iOS-only imports — guarded so Android build doesn't fail
+let SymbolView: any = null;
+let isLiquidGlassAvailable: (() => boolean) | null = null;
+let NativeTabs: any = null;
+let Icon: any = null;
+let Label: any = null;
+
+if (Platform.OS === "ios") {
+  try { ({ SymbolView } = require("expo-symbols")); } catch (_) {}
+  try { ({ isLiquidGlassAvailable } = require("expo-glass-effect")); } catch (_) {}
+  try { ({ NativeTabs, Icon, Label } = require("expo-router/unstable-native-tabs")); } catch (_) {}
+}
+
 function NativeTabLayout() {
+  if (!NativeTabs) return <ClassicTabLayout />;
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="tasks">
@@ -37,7 +47,6 @@ function ClassicTabLayout() {
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
-
   const tabBarHeight = isWeb ? 84 : 50;
 
   return (
@@ -77,7 +86,7 @@ function ClassicTabLayout() {
         options={{
           title: "Tasks",
           tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
+            isIOS && SymbolView ? (
               <SymbolView name={focused ? "list.bullet.rectangle.fill" : "list.bullet.rectangle"} tintColor={color} size={22} />
             ) : (
               <Feather name="list" size={20} color={color} />
@@ -89,7 +98,7 @@ function ClassicTabLayout() {
         options={{
           title: "Printers",
           tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
+            isIOS && SymbolView ? (
               <SymbolView name={focused ? "printer.fill" : "printer"} tintColor={color} size={22} />
             ) : (
               <Feather name="printer" size={20} color={color} />
@@ -101,7 +110,7 @@ function ClassicTabLayout() {
         options={{
           title: "Team",
           tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
+            isIOS && SymbolView ? (
               <SymbolView name={focused ? "person.3.fill" : "person.3"} tintColor={color} size={22} />
             ) : (
               <Feather name="users" size={20} color={color} />
@@ -113,7 +122,7 @@ function ClassicTabLayout() {
         options={{
           title: "Stats",
           tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
+            isIOS && SymbolView ? (
               <SymbolView name={focused ? "chart.bar.fill" : "chart.bar"} tintColor={color} size={22} />
             ) : (
               <Feather name="bar-chart-2" size={20} color={color} />
@@ -125,7 +134,8 @@ function ClassicTabLayout() {
 }
 
 export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
+  // Use native glass tabs only on iOS when available
+  if (Platform.OS === "ios" && isLiquidGlassAvailable && isLiquidGlassAvailable()) {
     return <NativeTabLayout />;
   }
   return <ClassicTabLayout />;
