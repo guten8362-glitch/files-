@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "print-tech-flow",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -20,10 +20,12 @@
       },
       "package": "com.maintance",
       "googleServicesFile": "./google-services.json",
-      "permissions": [
-        "POST_NOTIFICATIONS",
-        "VIBRATE"
-      ]
+      "permissions": ["POST_NOTIFICATIONS", "VIBRATE"],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCuA1j_Vp1ZMJusVXSfma2snhIB1N37Y4E"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -44,12 +46,6 @@
             "./assets/notification.wav",
             "./assets/notification.mp3"
           ]
-        }
-      ],
-      [
-        "react-native-maps",
-        {
-          "googleMapsApiKey": "AIzaSyCuA1j_Vp1ZMJusVXSfma2snhIB1N37Y4E"
         }
       ]
     ],
