@@ -20,12 +20,10 @@
       },
       "package": "com.maintance",
       "googleServicesFile": "./google-services.json",
-      "permissions": ["POST_NOTIFICATIONS", "VIBRATE"],
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyCuA1j_Vp1ZMJusVXSfma2snhIB1N37Y4E"
-        }
-      }
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "VIBRATE"
+      ]
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -47,8 +45,13 @@
             "./assets/notification.mp3"
           ]
         }
+      ],
+      [
+        "react-native-maps",
+        {
+          "googleMapsApiKey": "AIzaSyCuA1j_Vp1ZMJusVXSfma2snhIB1N37Y4E"
+        }
       ]
-
     ],
     "experiments": {
       "typedRoutes": false,
