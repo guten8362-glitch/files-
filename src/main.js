@@ -190,6 +190,20 @@ export default async ({ req, res, log, error }) => {
             return res.json({ success: true });
         }
 
+        // Force-delete sessions for a user (used for re-login recovery)
+        if (path === '/deleteUserSessions' && method === 'POST') {
+            const { userId } = payload;
+            if (!userId) return res.json({ error: 'Missing userId' }, 400);
+            try {
+                await usersApi.deleteSessions(userId);
+                log(`[DeleteSessions] ✓ Cleared all sessions for user ${userId}`);
+                return res.json({ success: true });
+            } catch (e) {
+                error(`[DeleteSessions] Error: ${e.message}`);
+                return res.json({ error: e.message }, 500);
+            }
+        }
+
         if (path === '/users' && method === 'GET') {
             const result = await databases.listDocuments(DATABASE_ID, USERS_COL, [Query.limit(100)]);
             return res.json({ success: true, users: result.documents });
