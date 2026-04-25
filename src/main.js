@@ -95,6 +95,58 @@ async function sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title
     }
 }
 
+// ─── Direct FCM Notification (For Background Sound) ──────────────────────────
+async function sendDirectFCM(fcmTokens, title, body, data, log, error) {
+    const serverKey = process.env.FCM_SERVER_KEY;
+    if (!serverKey) {
+        log('[FCM] Skipping direct push: FCM_SERVER_KEY is not set in environment variables.');
+        return false;
+    }
+
+    const payload = {
+        registration_ids: fcmTokens,
+        priority: 'high',
+        notification: {
+            title,
+            body,
+            sound: 'notification',
+            android_channel_id: 'priority_alerts_v2'
+        },
+        android: {
+            priority: 'high',
+            notification: {
+                channel_id: 'priority_alerts_v2',
+                sound: 'notification',
+                default_vibrate_timings: false,
+                vibrate_timings: ['0s', '0.5s', '0.5s', '0.5s'],
+                notification_priority: 'PRIORITY_MAX'
+            }
+        },
+        data: {
+            ...data,
+            channelId: 'priority_alerts_v2',
+            android_channel_id: 'priority_alerts_v2'
+        }
+    };
+
+    try {
+        const response = await fetch('https://fcm.googleapis.com/fcm/send', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `key=${serverKey}`
+            },
+            body: JSON.stringify(payload)
+        });
+        const resJson = await response.json();
+        log(`[FCM] Direct push success: ${resJson.success}, failure: ${resJson.failure}`);
+        return resJson.success > 0;
+    } catch (e) {
+        error(`[FCM] Direct push error: ${e.message}`);
+        return false;
+    }
+}
+
 // ─── Master notification dispatcher ──────────────────────────────────────────
 async function dispatchPushNotification(databases, messaging, users, DATABASE_ID, USERS_COL, FCM_PROVIDER_ID, issueType, doc, log, error) {
     const location = (doc.location || doc.building || 'UNKNOWN LOCATION').toUpperCase();
@@ -109,13 +161,29 @@ async function dispatchPushNotification(databases, messaging, users, DATABASE_ID
         printerId: String(printerId),
         location: String(location),
         priority: String(rule.priority),
-        screen: 'tasks',
-        channelId: 'priority_alerts_v2', // FORCED SOUND VERSION
-        android_channel_id: 'priority_alerts_v2'
+        screen: 'tasks'
     };
 
-    log(`[NOTIFY] Dispatching to channel: priority_alerts_v2`);
-    await sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title, bodyText, data, log, error);
+    log(`[NOTIFY] Dispatching background-sound-alert via Direct FCM`);
+    
+    // 1. Get all saved tokens from the DB
+    try {
+        const userDocs = await databases.listDocuments(DATABASE_ID, USERS_COL, [Query.limit(100)]);
+        const tokens = userDocs.documents
+            .flatMap(d => Array.isArray(d.fcmToken) ? d.fcmToken : [])
+            .filter(t => t && t.length > 10);
+            
+        if (tokens.length > 0) {
+            await sendDirectFCM(tokens, title, bodyText, data, log, error);
+        } else {
+            log('[NOTIFY] No tokens found in DB for direct FCM.');
+        }
+    } catch (e) {
+        error(`[NOTIFY] Token fetch error: ${e.message}`);
+    }
+
+    // 2. Also send via standard Messaging for history/record
+    await sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title, bodyText, { ...data, channelId: 'priority_alerts_v2' }, log, error);
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
