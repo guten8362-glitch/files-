@@ -110,12 +110,12 @@ async function sendDirectFCM(fcmTokens, title, body, data, log, error) {
             title,
             body,
             sound: 'notification',
-            android_channel_id: 'priority_alerts_v2'
+            android_channel_id: 'priority_alerts_v3'
         },
         android: {
             priority: 'high',
             notification: {
-                channel_id: 'priority_alerts_v2',
+                channel_id: 'priority_alerts_v3',
                 sound: 'notification',
                 default_vibrate_timings: false,
                 vibrate_timings: ['0s', '0.5s', '0.5s', '0.5s'],
@@ -124,8 +124,8 @@ async function sendDirectFCM(fcmTokens, title, body, data, log, error) {
         },
         data: {
             ...data,
-            channelId: 'priority_alerts_v2',
-            android_channel_id: 'priority_alerts_v2'
+            channelId: 'priority_alerts_v3',
+            android_channel_id: 'priority_alerts_v3'
         }
     };
 
@@ -164,7 +164,7 @@ async function dispatchPushNotification(databases, messaging, users, DATABASE_ID
         screen: 'tasks'
     };
 
-    log(`[NOTIFY] Dispatching background-sound-alert via Direct FCM`);
+    log(`[NOTIFY] Dispatching background-sound-alert via Direct FCM (v3)`);
     
     // 1. Get all saved tokens from the DB
     try {
@@ -183,7 +183,7 @@ async function dispatchPushNotification(databases, messaging, users, DATABASE_ID
     }
 
     // 2. Also send via standard Messaging for history/record
-    await sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title, bodyText, { ...data, channelId: 'priority_alerts_v2' }, log, error);
+    await sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title, bodyText, { ...data, channelId: 'priority_alerts_v3' }, log, error);
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
