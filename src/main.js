@@ -109,14 +109,15 @@ async function sendDirectFCM(fcmTokens, title, body, data, log, error) {
         notification: {
             title,
             body,
-            sound: 'notification.wav',
-            android_channel_id: 'priority_v5'
+            sound: 'notification',
+            android_channel_id: 'priority_v6_force',
+            channelId: 'priority_v6_force'
         },
         android: {
             priority: 'high',
             notification: {
-                channel_id: 'priority_v5',
-                sound: 'notification.wav',
+                channel_id: 'priority_v6_force',
+                sound: 'notification',
                 default_vibrate_timings: false,
                 vibrate_timings: ['0s', '0.5s', '0.5s', '0.5s'],
                 notification_priority: 'PRIORITY_MAX',
@@ -125,9 +126,9 @@ async function sendDirectFCM(fcmTokens, title, body, data, log, error) {
         },
         data: {
             ...data,
-            channelId: 'priority_v5',
-            android_channel_id: 'priority_v5',
-            sound: 'notification.wav'
+            channelId: 'priority_v6_force',
+            android_channel_id: 'priority_v6_force',
+            sound: 'notification'
         }
     };
 
@@ -185,7 +186,7 @@ async function dispatchPushNotification(databases, messaging, users, DATABASE_ID
     }
 
     // 2. Also send via standard Messaging for history/record
-    await sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title, bodyText, { ...data, channelId: 'priority_v5' }, log, error);
+    await sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title, bodyText, { ...data, channelId: 'priority_v6_force' }, log, error);
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
