@@ -204,7 +204,7 @@ export default async ({ req, res, log, error }) => {
 
     const DATABASE_ID = '69cbdded00392d03962c';
     const TASKS_COL = 'maintenance';
-    const USERS_COL = 'users_collection';
+    const USERS_COL = 'users';
     const FCM_PROVIDER_ID = '69d4d2ce0027660c1fe2'; // Provider ID from Messaging tab
 
     const path = req.path || '/';
