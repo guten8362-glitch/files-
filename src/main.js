@@ -109,14 +109,14 @@ async function sendDirectFCM(fcmTokens, title, body, data, log, error) {
         notification: {
             title,
             body,
-            sound: 'notification',
+            sound: 'notification.wav',
             android_channel_id: 'priority_alerts_v3'
         },
         android: {
             priority: 'high',
             notification: {
                 channel_id: 'priority_alerts_v3',
-                sound: 'notification',
+                sound: 'notification.wav',
                 default_vibrate_timings: false,
                 vibrate_timings: ['0s', '0.5s', '0.5s', '0.5s'],
                 notification_priority: 'PRIORITY_MAX'
@@ -125,7 +125,8 @@ async function sendDirectFCM(fcmTokens, title, body, data, log, error) {
         data: {
             ...data,
             channelId: 'priority_alerts_v3',
-            android_channel_id: 'priority_alerts_v3'
+            android_channel_id: 'priority_alerts_v3',
+            sound: 'notification.wav'
         }
     };
 
