@@ -110,22 +110,23 @@ async function sendDirectFCM(fcmTokens, title, body, data, log, error) {
             title,
             body,
             sound: 'notification.wav',
-            android_channel_id: 'priority_alerts_v3'
+            android_channel_id: 'priority_v4_final'
         },
         android: {
             priority: 'high',
             notification: {
-                channel_id: 'priority_alerts_v3',
+                channel_id: 'priority_v4_final',
                 sound: 'notification.wav',
                 default_vibrate_timings: false,
                 vibrate_timings: ['0s', '0.5s', '0.5s', '0.5s'],
-                notification_priority: 'PRIORITY_MAX'
+                notification_priority: 'PRIORITY_MAX',
+                visibility: 'PUBLIC'
             }
         },
         data: {
             ...data,
-            channelId: 'priority_alerts_v3',
-            android_channel_id: 'priority_alerts_v3',
+            channelId: 'priority_v4_final',
+            android_channel_id: 'priority_v4_final',
             sound: 'notification.wav'
         }
     };
@@ -165,7 +166,7 @@ async function dispatchPushNotification(databases, messaging, users, DATABASE_ID
         screen: 'tasks'
     };
 
-    log(`[NOTIFY] Dispatching background-sound-alert via Direct FCM (v3)`);
+    log(`[NOTIFY] Dispatching background-sound-alert via Direct FCM (v4_final)`);
 
     // 1. Get all saved tokens from the DB
     try {
@@ -184,7 +185,7 @@ async function dispatchPushNotification(databases, messaging, users, DATABASE_ID
     }
 
     // 2. Also send via standard Messaging for history/record
-    await sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title, bodyText, { ...data, channelId: 'priority_alerts_v3' }, log, error);
+    await sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title, bodyText, { ...data, channelId: 'priority_v4_final' }, log, error);
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
@@ -317,6 +318,23 @@ export default async ({ req, res, log, error }) => {
             } catch (e) { }
 
             return res.json({ success: true });
+        }
+
+        // Test push route to verify background sound
+        if (path === '/testPush' && method === 'POST') {
+            const { userId } = payload;
+            if (!userId) return res.json({ error: 'Missing userId' }, 400);
+
+            try {
+                const userDoc = await databases.getDocument(DATABASE_ID, USERS_COL, userId);
+                const tokens = Array.isArray(userDoc.fcmToken) ? userDoc.fcmToken : [];
+                if (tokens.length === 0) return res.json({ error: 'No tokens found' }, 404);
+
+                await sendDirectFCM(tokens, "Test Alert", "Verification of background sound", { screen: 'tasks' }, log, error);
+                return res.json({ success: true, pushed: tokens.length });
+            } catch (e) {
+                return res.json({ error: e.message }, 500);
+            }
         }
 
         return res.json({ error: 'Not found' }, 404);
