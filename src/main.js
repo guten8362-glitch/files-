@@ -165,14 +165,14 @@ async function dispatchPushNotification(databases, messaging, users, DATABASE_ID
     };
 
     log(`[NOTIFY] Dispatching background-sound-alert via Direct FCM (v3)`);
-    
+
     // 1. Get all saved tokens from the DB
     try {
         const userDocs = await databases.listDocuments(DATABASE_ID, USERS_COL, [Query.limit(100)]);
         const tokens = userDocs.documents
             .flatMap(d => Array.isArray(d.fcmToken) ? d.fcmToken : [])
             .filter(t => t && t.length > 10);
-            
+
         if (tokens.length > 0) {
             await sendDirectFCM(tokens, title, bodyText, data, log, error);
         } else {
@@ -240,7 +240,7 @@ export default async ({ req, res, log, error }) => {
         if (path === '/ping') {
             return res.json({ status: 'Online', time: new Date().toISOString(), providerId: FCM_PROVIDER_ID });
         }
-        
+
         // Register Google/OTP user in `users_collection` securely on first login
         if (path === '/syncUser' && method === 'POST') {
             const { userId, email, name } = payload;
@@ -279,14 +279,14 @@ export default async ({ req, res, log, error }) => {
 
         if (path === '/tasks' && method === 'GET') {
             const result = await databases.listDocuments(DATABASE_ID, TASKS_COL, [Query.limit(100), Query.orderDesc('$createdAt')]);
-            
+
             // Map the tasks to include human-readable error types and priorities
             const mappedTasks = result.documents.map(doc => {
                 const rawError = doc.error_type || doc.error_code || doc.flag || doc.errorCode || '';
                 const mappedType = getMappedIssueType(rawError);
                 const rule = getRule(rawError);
-                return { 
-                    ...doc, 
+                return {
+                    ...doc,
                     error_type: mappedType, // Overwrite with human-readable string
                     priority_level: rule.priority,
                     priority_label: rule.label
