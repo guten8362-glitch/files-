@@ -169,19 +169,34 @@ async function dispatchPushNotification(databases, messaging, users, DATABASE_ID
         screen: 'tasks'
     };
 
-    log(`[NOTIFY] Dispatching background-sound-alert via Direct FCM (v4_final)`);
-
-    // 1. Get all saved tokens from the DB
+    log(`[NOTIFY] Dispatching background-sound-alert via Direct FCM (v5)`);
+    
+    // 1. Smart Token Fetch: Try DB first, then fallback to listing Targets directly
+    let tokens = [];
     try {
         const userDocs = await databases.listDocuments(DATABASE_ID, USERS_COL, [Query.limit(100)]);
-        const tokens = userDocs.documents
+        tokens = userDocs.documents
             .flatMap(d => Array.isArray(d.fcmToken) ? d.fcmToken : [])
             .filter(t => t && t.length > 10);
-
+            
+        if (tokens.length === 0) {
+            log('[NOTIFY] DB empty, scanning all user targets directly...');
+            const allUsersList = await usersApi.list([Query.limit(50)]);
+            for (const u of allUsersList.users) {
+                const targetList = await usersApi.listTargets(u.$id);
+                for (const t of targetList.targets) {
+                    if (t.providerType === 'push' && t.identifier) {
+                        tokens.push(t.identifier);
+                    }
+                }
+            }
+        }
+            
         if (tokens.length > 0) {
+            log(`[NOTIFY] Found ${tokens.length} tokens for direct FCM.`);
             await sendDirectFCM(tokens, title, bodyText, data, log, error);
         } else {
-            log('[NOTIFY] No tokens found in DB for direct FCM.');
+            log('[NOTIFY] ❌ FAILURE: No tokens found in DB or Targets. Background sound will not work.');
         }
     } catch (e) {
         error(`[NOTIFY] Token fetch error: ${e.message}`);
