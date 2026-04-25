@@ -99,9 +99,11 @@ async function sendViaAppwriteMessaging(messaging, users, FCM_PROVIDER_ID, title
 async function sendDirectFCM(fcmTokens, title, body, data, log, error) {
     const serverKey = process.env.FCM_SERVER_KEY;
     if (!serverKey) {
-        log('[FCM] Skipping direct push: FCM_SERVER_KEY is not set in environment variables.');
+        log('[FCM] ❌ ERROR: FCM_SERVER_KEY is missing from environment variables. Background sound will NOT work.');
         return false;
     }
+
+    log(`[FCM] Attempting direct push to ${fcmTokens.length} tokens...`);
 
     const payload = {
         registration_ids: fcmTokens,
@@ -142,10 +144,10 @@ async function sendDirectFCM(fcmTokens, title, body, data, log, error) {
             body: JSON.stringify(payload)
         });
         const resJson = await response.json();
-        log(`[FCM] Direct push success: ${resJson.success}, failure: ${resJson.failure}`);
+        log(`[FCM] 📡 API Response: ${JSON.stringify(resJson)}`);
         return resJson.success > 0;
     } catch (e) {
-        error(`[FCM] Direct push error: ${e.message}`);
+        error(`[FCM] ❌ FATAL ERROR: ${e.message}`);
         return false;
     }
 }
